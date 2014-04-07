@@ -8,6 +8,9 @@
     var tempEl = doc.createElement('div');
     var addEventListener = 'addEventListener';
     var prototype = 'prototype';
+    var setAttribute = 'setAttribute';
+    var getAttribute = 'getAttribute';
+    var parentElement = 'parentElement';
     var dataComponentNameAttribute = 'data-component-name';
     var dataComponentIdAttribute = 'data-component-id';
 
@@ -32,13 +35,13 @@
 
         while (el && el !== doc.body) {
 
-            id = el.getAttribute(dataComponentIdAttribute);
+            id = el[getAttribute](dataComponentIdAttribute);
 
             if (id) {
                 return componentInstances[id] || null;
             }
 
-            el = el.parentElement;
+            el = el[parentElement];
         }
 
         return null;
@@ -58,7 +61,7 @@
                 return el;
             }
 
-            el = el.parentElement;
+            el = el[parentElement];
         }
 
         return null;
@@ -84,7 +87,7 @@
 
         //fall back to performing a selector:
         var match;
-        var parent = el.parentElement;
+        var parent = el[parentElement];
         var temp = !parent;
 
         if (temp) {
@@ -107,8 +110,8 @@
      */
     var fromElement = components.fromElement = function (el) {
 
-        var name = el.getAttribute(dataComponentNameAttribute);
-        var id = el.getAttribute(dataComponentIdAttribute);
+        var name = el[getAttribute](dataComponentNameAttribute);
+        var id = el[getAttribute](dataComponentIdAttribute);
 
         if (!name) {
             return null;
@@ -140,8 +143,8 @@
 
         this.el = el;
         this._id = componentId++;
-        this.el.setAttribute(dataComponentNameAttribute, this.name);
-        this.el.setAttribute(dataComponentIdAttribute, this._id);
+        this.el[setAttribute](dataComponentNameAttribute, this.name);
+        this.el[setAttribute](dataComponentIdAttribute, this._id);
         this.events = this.events || [];
         this.init();
     };
@@ -182,8 +185,8 @@
         },
 
         remove: function () {
-            if (this.el && this.el.parentElement) {
-                this.el.parentElement.removeChild(this.el);
+            if (this.el && this.el[parentElement]) {
+                this.el[parentElement].removeChild(this.el);
             }
             return this;
         },

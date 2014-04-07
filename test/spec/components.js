@@ -278,6 +278,10 @@ describe('components', function () {
             event = makeEvent('click', document.getElementById('second'));
             components.handleEvent(event);
             expect(spy.callCount).to.equal(2);
+
+            event = makeEvent('touchstart', document.getElementById('second'));
+            components.handleEvent(event);
+            expect(spy.callCount).to.equal(2);
         });
 
         it('should handle complicated selectors', function () {
