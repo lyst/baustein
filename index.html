@@ -1,0 +1,73 @@
+<!doctype html>
+
+<html>
+
+
+</html>
+
+<body>
+
+    <div data-component-name="special-component">I is something special yo.</div>
+
+    <ul data-component-name="list">
+        <li data-component-name="list-item">One</li>
+        <li data-component-name="list-item">Two</li>
+        <li data-component-name="list-item">Three</li>
+        <li data-component-name="list-item">Four</li>
+    </ul>
+
+    <script src="src/component.js"></script>
+    <script>
+
+        Component.register('special-component', {
+
+            events: [
+                {
+                    event: 'click',
+                    method: 'onClick'
+                }
+            ],
+
+            onClick: function (event) {
+                console.log(event);
+            }
+
+        });
+
+        Component.register('list', {
+
+            events: [
+                {
+                    event: 'click',
+                    method: 'onClick'
+                }
+            ],
+
+            onClick: function (e) {
+
+            }
+
+        });
+
+        Component.register('list-item', {
+
+            events: [
+                {
+                    event: 'click',
+                    method: 'onClick'
+                }
+            ],
+
+            onClick: function () {
+                console.log(this.el.outerHTML + ' click');
+                this.destroy();
+            }
+
+        });
+
+        Component.parse();
+        Component.bindEvents();
+
+    </script>
+
+</body>
