@@ -204,15 +204,12 @@
 
     };
 
-    components.eventsHandled = 0;
-
     /**
      *
      * @param event
      */
     var handleEvent = components.handleEvent = function (event) {
 
-        components.eventsHandled++;
         var target = event.target;
         var type = event.type;
         var component = closestComponent(target);
