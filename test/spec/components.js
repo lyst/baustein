@@ -95,15 +95,6 @@ describe('components', function () {
 
         });
 
-        describe('#render()', function () {
-
-            it('should return this', function () {
-                var c = new Component();
-                expect(c.render()).to.equal(c);
-            });
-
-        });
-
         describe('#remove()', function () {
 
             var name, c;

@@ -11,11 +11,12 @@
     var setAttribute = 'setAttribute';
     var getAttribute = 'getAttribute';
     var parentElement = 'parentElement';
+    var appendChild = 'appendChild';
     var dataComponentNameAttribute = 'data-component-name';
     var dataComponentIdAttribute = 'data-component-id';
 
     /**
-     *
+     * Wrapper for query selector all that returns proper array.
      * @param {HTMLElement} root
      * @param {String} selector
      * @returns {Array}
@@ -25,9 +26,9 @@
     };
 
     /**
-     *
+     * Returns the nearest Component instance for the passed element.
      * @param {HTMLElement} el
-     * @returns {HTMLElement|Null}
+     * @returns {Component}
      */
     var closestComponent = function (el) {
 
@@ -48,7 +49,7 @@
     };
 
     /**
-     *
+     * Returns the closest element to el that matches the given selector.
      * @param {HTMLElement} el
      * @param {String} selector
      * @returns {HTMLElement|Null}
@@ -68,15 +69,17 @@
     };
 
     /**
-     *
-     * @param el
-     * @param selector
-     * @returns {*}
+     * Wrapper around the HTMLElement.prototype.matches
+     * method to support vendor prefixed versions.
+     * @param {HTMLElement} el
+     * @param {String} selector
+     * @returns {Boolean}
      */
     var matches = function (el, selector) {
 
         var matchesSelector = el.webkitMatchesSelector ||
             el.mozMatchesSelector ||
+            el.msMatchesSelector ||
             el.oMatchesSelector ||
             el.matchesSelector ||
             el.matches;
@@ -85,14 +88,14 @@
             return matchesSelector.call(el, selector);
         }
 
-        //fall back to performing a selector:
+        // fall back to performing a selector:
         var match;
         var parent = el[parentElement];
         var temp = !parent;
 
         if (temp) {
             parent = tempEl;
-            parent.appendChild(el);
+            parent[appendChild](el);
         }
 
         match = qsa(parent, selector).indexOf(el) !== -1;
@@ -105,7 +108,9 @@
     };
 
     /**
-     *
+     * Returns the Component instance for the passed element or null.
+     * If a component instance has already been created for this element
+     * then it is returned, if not a new instance of the correct Component is created.
      * @param {HTMLElement} el
      */
     var fromElement = components.fromElement = function (el) {
@@ -113,10 +118,12 @@
         var name = el[getAttribute](dataComponentNameAttribute);
         var id = el[getAttribute](dataComponentIdAttribute);
 
+        // if no name then it is not a component
         if (!name) {
             return null;
         }
 
+        // if there is an id we must already have a component instance
         if (id) {
             return componentInstances[id];
         }
@@ -125,13 +132,14 @@
             throw Error('No component has been registered with name ' + name);
         }
 
+        // create a new Component instance
         var component = new componentClasses[name](el);
         componentInstances[component._id] = component;
         return component;
     };
 
     /**
-     *
+     * Creates a new Component
      * @param el
      * @constructor
      */
@@ -148,24 +156,26 @@
         this.init();
     };
 
-    /**
-     *
-     * @type {{init: init}}
-     */
     Component[prototype] = {
 
         name: '',
 
         tagName: 'div',
 
+        /**
+         * The init function will be called when the Component is created.
+         * This maybe be through the parsing of DOM or through directly creating the component.
+         * @returns {Component}
+         */
         init: function () {
             return this;
         },
 
-        render: function () {
-            return this;
-        },
-
+        /**
+         * Appends either an element or another Component into this component.
+         * @param {HTMLElement|Component} target
+         * @returns {Component}
+         */
         appendTo: function (target) {
 
             if (!target) {
@@ -173,16 +183,20 @@
             }
 
             if (target instanceof Component && target.el) {
-                target.el.appendChild(this.el);
+                target.el[appendChild](this.el);
             }
 
-            if (target.appendChild) {
-                target.appendChild(this.el);
+            if (target[appendChild]) {
+                target[appendChild](this.el);
             }
 
             return this;
         },
 
+        /**
+         * Removes this component from the DOM.
+         * @returns {Component}
+         */
         remove: function () {
             if (this.el && this.el[parentElement]) {
                 this.el[parentElement].removeChild(this.el);
@@ -190,6 +204,13 @@
             return this;
         },
 
+        /**
+         * Removes this Component from the DOM and deletes the instance from the instances pool.
+         * Null is returned for convenience so it is easy to get rid of references to a Component.
+         *    var component = components.fromElement(el);
+         *    component = component.destroy();
+         * @returns {null}
+         */
         destroy: function () {
             this.remove();
             this.el = null;
@@ -197,14 +218,31 @@
             return null;
         },
 
+        /**
+         * In the case that this Component is created directly by invoking the constructor with
+         * no element this method will be called to create the root element.
+         * @returns {HTMLElement}
+         */
         createRootElement: function () {
             return doc.createElement(this.tagName);
         },
 
+        /**
+         * Convenience method for performing querySelectorAll
+         * within the context of this Component.
+         * @param {String} selector
+         * @returns {HTMLElement[]}
+         */
         findAll: function (selector) {
             return this.el ? qsa(this.el, selector) : [];
         },
 
+        /**
+         * Convenience method for performing querySelector within
+         * the context of this Component.
+         * @param {String} selector
+         * @returns {HTMLElement|Null}
+         */
         find: function (selector) {
             return this.el ? this.el.querySelector(selector) : null;
         }
@@ -212,8 +250,9 @@
     };
 
     /**
-     *
-     * @param event
+     * Handles all events and invokes Component handlers
+     * based on their events object.
+     * @param {Event} event
      */
     var handleEvent = components.handleEvent = function (event) {
 
@@ -265,7 +304,7 @@
     };
 
     /**
-     *
+     * Parses the given element or the body and creates Component instances.
      * @param {HTMLElement} [root]
      */
     components.parse = function (root) {
@@ -275,7 +314,7 @@
     };
 
     /**
-     *
+     * Registers a new Component.
      * @param {String|Object} name
      * @param {Object} [impl] The implementation methods / properties.
      * @returns {Function}
@@ -313,11 +352,9 @@
     };
 
     /**
-     *
+     * Binds all events to the body.
      */
     components.bindEvents = function () {
-
-        var root = doc.body;
 
         ['click',
          'mousedown',
@@ -328,11 +365,13 @@
          'touchend',
          'keyup',
          'keydown',
+
+         // the following events require useCapture
          'blur',
          'focus',
          'submit',
          'change'].forEach(function (event, i) {
-            root[addEventListener](event, handleEvent, i > 8);
+            doc.body[addEventListener](event, handleEvent, i > 8);
         });
 
     };
