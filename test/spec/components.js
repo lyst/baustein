@@ -68,11 +68,11 @@ describe('components', function () {
             expect(el.getAttribute('data-component-name')).to.eql(component.name);
         });
 
-        it('should make sure events in an array', function () {
+        it('should contain an events object only if one was defined', function () {
             var c = new Component();
-            expect(c.events).to.be.an(Array);
+            expect(c.events).to.equal(undefined);
 
-            var events = [];
+            var events = {};
             var C = components.register(createComponentName(), {
                 events: events
             });
@@ -238,22 +238,15 @@ describe('components', function () {
             var event = makeEvent('click', document.getElementById('first'));
 
             components.register(name1, {
-                events: [
-                    {
-                        event: 'click',
-                        method: 'onClick'
-                    }
-                ],
+                events: {
+                    'click': 'onClick'
+                },
                 onClick: spy
             });
             components.register(name2, {
-                events: [
-                    {
-                        event: 'click',
-                        selector: '.outer',
-                        method: 'onOuterClick'
-                    }
-                ],
+                events: {
+                    '.outer:click': 'onOuterClick'
+                },
                 onOuterClick: spy
             });
             components.register(name3);
@@ -298,13 +291,9 @@ describe('components', function () {
             var event = makeEvent('click', document.getElementById('target'));
 
             components.register(name, {
-                events: [
-                    {
-                        event: 'click',
-                        selector: '.one.two [data-some-attribute]',
-                        method: 'onClick'
-                    }
-                ],
+                events: {
+                    '.one.two [data-some-attribute]:click': 'onClick'
+                },
                 onClick: spy
             });
 

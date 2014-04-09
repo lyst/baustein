@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>component - events</title>
+</head>
+<body>
+
+    <div data-component-name="test-component">
+
+        <form>
+
+            <div>
+                <input type="text" name="text-input" value="foo">
+            </div>
+            <div>
+                <strong>Current value: </strong><span class="text-input-value"></span>
+            </div>
+            <div>
+                <label for="checkbox-input">Checkbox</label>
+                <input type="checkbox" name="checkbox-input" id="checkbox-input">
+            </div>
+            <div>
+                <strong>Selected: </strong><span class="checkbox-input-value"></span>
+            </div>
+
+        </form>
+
+    </div>
+
+    <script src="../../src/components.js"></script>
+    <script>
+
+        components.register('test-component', {
+
+            events: {
+                '[name="text-input"]:keyup': 'onInputChange',
+                '[name="checkbox-input"]:change': 'onCheckboxChange'
+            },
+
+            onInputChange: function (event, input) {
+                this.find('.text-input-value').innerHTML = input.value;
+            },
+
+            onCheckboxChange: function (event, input) {
+                this.find('.checkbox-input-value').innerHTML = input.checked ? 'Checked' : 'Unchecked';
+            }
+
+        });
+
+        components.bindEvents();
+        components.parse();
+
+    </script>
+</body>
+</html>
