@@ -38,7 +38,7 @@
             id = el[getAttribute](dataComponentIdAttribute);
 
             if (id) {
-                return componentInstances[id] || null;
+                return componentInstances[id];
             }
 
             el = el[parentElement];
@@ -145,7 +145,6 @@
         this._id = componentId++;
         this.el[setAttribute](dataComponentNameAttribute, this.name);
         this.el[setAttribute](dataComponentIdAttribute, this._id);
-        this.events = this.events || [];
         this.init();
     };
 
@@ -200,6 +199,14 @@
 
         createRootElement: function () {
             return doc.createElement(this.tagName);
+        },
+
+        findAll: function (selector) {
+            return this.el ? qsa(this.el, selector) : [];
+        },
+
+        find: function (selector) {
+            return this.el ? this.el.querySelector(selector) : null;
         }
 
     };
@@ -219,23 +226,36 @@
         }
 
         var events = component.events;
-        var el;
+        var el, key, selector, eventType, parts, method;
 
-        for (var i = 0; i < events.length; i++) {
+        if (!events) {
+            return;
+        }
 
-            if (events[i].event === type) {
+        for (key in events) {
 
-                if (events[i].selector) {
+            if (!events.hasOwnProperty(key)) {
+                continue;
+            }
 
-                    el = closestSelector(target, events[i].selector);
+            parts = key.split(':');
+            selector = parts.length > 1 ? parts[0] : null;
+            eventType = parts.length > 1 ? parts[1] : parts[0];
+            method = events[key];
+
+            if (eventType === type) {
+
+                if (selector) {
+
+                    el = closestSelector(target, selector);
 
                     if (el) {
-                        component[events[i].method](event, el);
+                        component[method](event, el);
                     }
 
                 }
                 else {
-                    component[events[i].method](event);
+                    component[method](event);
                 }
 
             }
@@ -295,7 +315,7 @@
     /**
      *
      */
-    Component.bindEvents = function () {
+    components.bindEvents = function () {
 
         var root = doc.body;
 
