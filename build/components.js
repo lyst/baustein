@@ -378,7 +378,7 @@
 
     if (window.define && define.amd) {
         define(function () {
-            return Component;
+            return components;
         });
     }
     else {
