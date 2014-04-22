@@ -1,5 +1,6 @@
 (function () {
 
+    var win = window;
     var doc = document;
     var components = {};
     var componentClasses = {};
@@ -14,6 +15,32 @@
     var appendChild = 'appendChild';
     var dataComponentNameAttribute = 'data-component-name';
     var dataComponentIdAttribute = 'data-component-id';
+    var pointerEventsMap = {
+        mousedown: 'pointerdown',
+        mousemove: 'pointermove',
+        mouseup: 'pointerup',
+        touchstart: 'pointerdown',
+        touchmove: 'pointermove',
+        touchend: 'pointerup'
+    };
+    var lastTime = 0;
+    var vendors = ['ms', 'moz', 'webkit', 'o'];
+    var globalHandlers = {};
+
+    for (var x = 0; x < vendors.length && !win.requestAnimationFrame; ++x) {
+        win.requestAnimationFrame = win[vendors[x] + 'RequestAnimationFrame'];
+    }
+
+    if (!win.requestAnimationFrame) {
+        win.requestAnimationFrame = function (callback, element) {
+            var currTime = new Date().getTime();
+            var timeToCall = Math.max(0, 16 - (currTime - lastTime));
+            win.setTimeout(function () {
+                callback(currTime + timeToCall);
+            }, timeToCall);
+            lastTime = currTime + timeToCall;
+        };
+    }
 
     /**
      * Wrapper for query selector all that returns proper array.
@@ -245,6 +272,45 @@
          */
         find: function (selector) {
             return this.el ? this.el.querySelector(selector) : null;
+        },
+
+        getCoordsFromEvent: function (event) {
+
+            var point = event.touches && event.touches[0] ? event.touches[0] : event;
+
+            return {
+                x: point.pageX,
+                y: point.pageY
+            };
+        },
+
+        requestAnimationFrame: function (fn) {
+            win.requestAnimationFrame(fn.bind(this));
+        },
+
+        setGlobalEvent: function (event, fn) {
+            globalHandlers[event] = globalHandlers[event] || [];
+
+            globalHandlers[event].push({
+                fn: fn,
+                ctx: this
+            });
+
+            return this;
+        },
+
+        releaseGlobalEvent: function (event, fn) {
+            var handlers = globalHandlers[event];
+
+            if (!handlers) {
+                return this;
+            }
+
+            globalHandlers[event] = handlers.filter(function (handler) {
+                return handler.fn !== fn;
+            });
+
+            return this;
         }
 
     };
@@ -261,6 +327,7 @@
         var component = closestComponent(target);
 
         if (!component) {
+            invokeGlobalHandlers(event);
             return;
         }
 
@@ -268,6 +335,7 @@
         var el, key, selector, eventType, parts, method;
 
         if (!events) {
+            invokeGlobalHandlers(event);
             return;
         }
 
@@ -282,7 +350,7 @@
             eventType = parts.length > 1 ? parts[1] : parts[0];
             method = events[key];
 
-            if (eventType === type) {
+            if (eventType === type || pointerEventsMap[type] === eventType) {
 
                 if (selector) {
 
@@ -301,6 +369,24 @@
 
         }
 
+        invokeGlobalHandlers(event);
+    };
+
+    /**
+     * Invokes
+     * @param event
+     */
+    var invokeGlobalHandlers = function (event) {
+
+        var handlers = globalHandlers[event.type] || globalHandlers[pointerEventsMap[event.type]];
+
+        if (!handlers) {
+            return;
+        }
+
+        for (var i = 0, length = handlers.length; i < length; i++) {
+            handlers[i].fn.call(handlers[i].ctx, event, doc.body);
+        }
     };
 
     /**
@@ -336,7 +422,8 @@
             Component.apply(this, arguments);
         };
 
-        var Surrogate = function () {};
+        var Surrogate = function () {
+        };
         Surrogate[prototype] = Component[prototype];
         Constructor[prototype] = new Surrogate();
         Constructor[prototype].name = name;
@@ -372,17 +459,17 @@
          'submit',
          'change'].forEach(function (event, i) {
             doc.body[addEventListener](event, handleEvent, i > 8);
-        });
+         });
 
     };
 
-    if (window.define && define.amd) {
+    if (win.define && define.amd) {
         define(function () {
             return components;
         });
     }
     else {
-        window.components = components;
+        win.components = components;
     }
 
 })();

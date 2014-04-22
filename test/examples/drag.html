@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>component - events</title>
+
+    <style>
+        html, body {
+            height: 100%;
+        }
+        body {
+            font-family: sans-serif;
+            line-height: 1.5em;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        [data-component-name="test-component"] {
+            width: 200px;
+            height: 200px;
+            margin: 50px;
+            display: inline-block;
+            background-color: black;
+            position: relative;
+            -webkit-user-select: none;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        .x, .y {
+            position: absolute;
+            width: 100px;
+            display: inline-block;
+            text-align: center;
+            line-height: 200px;
+            color: white;
+        }
+        .x {
+            left: 0;
+        }
+        .y {
+            right: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div data-component-name="test-component">
+        <span class="x"></span>
+        <span class="y"></span>
+    </div>
+    <div data-component-name="test-component">
+        <span class="x"></span>
+        <span class="y"></span>
+    </div>
+    <div data-component-name="test-component">
+        <span class="x"></span>
+        <span class="y"></span>
+    </div>
+    <div data-component-name="test-component">
+        <span class="x"></span>
+        <span class="y"></span>
+    </div>
+
+    <script src="../../src/components.js"></script>
+    <script>
+
+        components.register('test-component', {
+
+            events: {
+                'pointerdown': 'dragStart'
+            },
+
+            init: function () {
+                this.find('.x').innerHTML = '0';
+                this.find('.y').innerHTML = '0';
+            },
+
+            dragStart: function (event) {
+                this.isDragging = true;
+                this.coords = this.coords || this.getCoordsFromEvent(event);
+                this.setGlobalEvent('pointermove', this.dragMove);
+                this.setGlobalEvent('pointerup', this.dragEnd);
+            },
+
+            dragMove: function (event) {
+
+                if (!this.isDragging) {
+                    return;
+                }
+
+                var coords = this.getCoordsFromEvent(event);
+                var deltaX = coords.x - this.coords.x;
+                var deltaY = coords.y - this.coords.y;
+
+                this.requestAnimationFrame(function () {
+                    this.find('.x').innerHTML = deltaX;
+                    this.find('.y').innerHTML = deltaY;
+                    this.el.style.zIndex = '9999';
+                    this.el.style.webkitTransform = 'translate3d(' + deltaX + 'px, ' + deltaY + 'px, 0)';
+                });
+            },
+
+            dragEnd: function () {
+                this.releaseGlobalEvent('pointermove', this.dragMove);
+                this.releaseGlobalEvent('pointerup', this.dragEnd);
+                this.isDragging = false;
+                this.requestAnimationFrame(function () {
+                    this.el.style.zIndex = '';
+                });
+            }
+
+        });
+
+        components.bindEvents();
+        components.parse();
+
+    </script>
+</body>
+</html>
