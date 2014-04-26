@@ -165,6 +165,54 @@ describe('components', function () {
 
         });
 
+        describe('#invoke(components, methodName, ...args)', function () {
+
+            var def, arr;
+
+            beforeEach(function () {
+                def = {
+                    someMethod: sinon.spy()
+                };
+
+                var C = components.register(createComponentName(), def);
+
+                arr = [new C(), new C(), new C()];
+            });
+
+            it('should call the given function on each component in the array', function () {
+                new Component().invoke(arr, 'someMethod');
+                expect(def.someMethod.callCount).to.equal(3);
+            });
+
+            it('should call the methods with the correct context', function () {
+                new Component().invoke(arr, 'someMethod');
+
+                arr.forEach(function (ctx, i) {
+                    expect(def.someMethod.getCall(i).calledOn(ctx)).to.equal(true);
+                });
+
+            });
+
+            it('should pass any additional arguments to the method', function () {
+                new Component().invoke(arr, 'someMethod', 'one', 'two', 'three');
+
+                arr.forEach(function (ctx, i) {
+                    expect(def.someMethod.getCall(i).args).to.eql(['one', 'two', 'three']);
+                });
+
+            });
+
+            it('should also accept a single component', function () {
+                new Component().invoke(arr[0], 'someMethod');
+                expect(def.someMethod.callCount).to.equal(1);
+            });
+
+            it('should do nothing if first argument is not valid', function () {
+                expect(new Component().invoke(null, 'someMethod')).to.be.ok();
+            });
+
+        });
+
     });
 
     describe('components.register(name, implementation)', function () {
@@ -209,7 +257,7 @@ describe('components', function () {
 
     });
 
-    describe('#components.handleEvent(event)', function () {
+    describe('components.handleEvent(event)', function () {
 
         it('should invoke the correct method on the correct component', function () {
 
@@ -296,7 +344,7 @@ describe('components', function () {
 
     });
 
-    describe('#components.fromElement(element)', function () {
+    describe('components.fromElement(element)', function () {
 
         var name, el;
 
@@ -325,6 +373,13 @@ describe('components', function () {
 
         it('should return null if the element has no component name attribute', function () {
             expect(components.fromElement(document.createElement('div'))).to.equal(null);
+        });
+
+        it('should return null if the passed argument is not an element', function () {
+            expect(components.fromElement(null)).to.equal(null);
+            expect(components.fromElement({})).to.equal(null);
+            expect(components.fromElement(function () {})).to.equal(null);
+            expect(components.fromElement('<div></div>')).to.equal(null);
         });
 
     });

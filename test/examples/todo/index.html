@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>component - todo</title>
+    <link href="todo.css" rel="stylesheet">
+</head>
+<body>
+
+<div data-component-name="todos-app" id="todoapp"></div>
+<footer id="info">
+    <p>Double-click to edit a todo</p>
+</footer>
+
+<script type="x-template" id="todos-app-template">
+    <header id="header">
+        <h1>todos</h1>
+        <form data-component-name="todos-form"></form>
+    </header>
+    <div id="main" class="hidden">
+        <input id="toggle-all" type="checkbox">
+        <ul id="todo-list"></ul>
+    </div>
+    <footer id="footer" class="hidden" data-component-name="todos-footer"></footer>
+</script>
+
+<script type="x-template" id="todos-footer-template">
+    <span id="todo-count" class="todos-total-count"></span>
+    <ul id="filters">
+        <li><a class="selected todos-filter" href="#/all">All</a></li>
+        <li><a class="todos-filter" href="#/active">Active</a></li>
+        <li><a class="todos-filter" href="#/completed">Completed</a></li>
+    </ul>
+    <button id="clear-completed" class="hidden">
+        Clear completed (<span class="todos-completed-count"></span>)
+    </button>
+</script>
+
+<script type="x-template" id="todos-form-template">
+    <input id="new-todo" type="text" name="todo-name" placeholder="What do you need to do?" autocomplete="off">
+</script>
+
+<script type="x-template" id="todo-item-template">
+    <input class="toggle view" type="checkbox">
+    <label class="view">{{ title }}</label>
+    <button class="destroy view"></button>
+    <form>
+        <input class="edit" value="{{ title }}">
+    </form>
+</script>
+
+<script src="../../../src/components.js"></script>
+<script>
+
+    var _super = components.Component.prototype;
+
+    components.register('todos-app', {
+
+        template: document.getElementById('todos-app-template').innerHTML,
+
+        events: {
+            'todos-form:new-todo': 'onNewTodoSave',
+
+            'todos-footer:clear-completed': 'onClearCompleted',
+            'todos-footer:filter-selected': 'onFilterSelected',
+
+            'todo-item:destroy': 'updateCounts',
+            'todo-item:status-change': 'updateCounts',
+
+            '#toggle-all:change': 'onToggleAll'
+        },
+
+        onNewTodoSave: function (event) {
+
+            var todoItem = new ToDoItem(null, {
+                title: event.title
+            });
+
+            todoItem.appendTo(this.find('#todo-list'));
+            this.updateCounts();
+        },
+
+        onToggleAll: function (event, input) {
+            this.invoke(
+                this.findAllComponents('todo-item'),
+                input.checked ? 'select' : 'deselect'
+            );
+        },
+
+        onClearCompleted: function () {
+            this.findAllComponents('todo-item').forEach(function (todoItem) {
+                if (todoItem.isComplete()) {
+                    todoItem.destroy();
+                }
+            });
+        },
+
+        onFilterSelected: function (event) {
+            var filter = event.filter;
+            var main = this.find('#main');
+
+            ['all', 'completed', 'active'].forEach(function (f) {
+                main.classList[f === filter ? 'add' : 'remove'](f);
+            });
+        },
+
+        getCounts: function () {
+            return this.findAllComponents('todo-item').reduce(function (result, todoItem) {
+
+                if (todoItem.isComplete()) {
+                    result.complete += 1;
+                }
+                else {
+                    result.active += 1;
+                }
+
+                result.total += 1;
+                return result;
+
+            }, {total: 0, complete: 0, active: 0});
+        },
+
+        updateCounts: function () {
+
+            var counts = this.getCounts();
+            var main = this.find('#main');
+            var footer = this.find('#footer');
+
+            if (!counts.total) {
+                main.classList.add('hidden');
+                footer.classList.add('hidden');
+                return;
+            }
+
+            this.find('#toggle-all').checked = counts.complete === counts.total;
+
+            main.classList.remove('hidden');
+            footer.classList.remove('hidden');
+            this.find('.todos-total-count').innerHTML = counts.active + ' item(s) left';
+
+            this.find('.todos-completed-count').innerHTML = counts.complete;
+            this.find('#clear-completed').classList[counts.complete ? 'remove' : 'add']('hidden');
+        }
+
+    });
+
+    components.register('todos-form', {
+
+        template: document.getElementById('todos-form-template').innerHTML,
+
+        events: {
+            'submit': 'onSave'
+        },
+
+        onSave: function (event) {
+            event.preventDefault();
+
+            var input = this.find('[name=todo-name]');
+            var title = input.value;
+            input.value = '';
+
+            if (!title) {
+                return;
+            }
+
+            this.emit('new-todo', {
+                title: title
+            });
+        }
+
+    });
+
+    components.register('todos-footer', {
+
+        template: document.getElementById('todos-footer-template').innerHTML,
+
+        events: {
+            '#clear-completed:click': 'onClearCompleted',
+            '.todos-filter:click': 'onFilterSelected'
+        },
+
+        onClearCompleted: function () {
+            this.emit('clear-completed');
+        },
+
+        onFilterSelected: function (event, link) {
+            event.preventDefault();
+
+            if (link.classList.contains('selected')) {
+                return;
+            }
+
+            this.findAll('.todos-filter').forEach(function (l) {
+                l.classList[l === link ? 'add' : 'remove']('selected');
+            });
+
+            this.emit('filter-selected', {
+                filter: link.href.substring(link.href.lastIndexOf('#') + 2)
+            });
+
+        }
+
+    });
+
+    var ToDoItem = components.register('todo-item', {
+
+        tagName: 'li',
+
+        template: function (ctx) {
+            return document.getElementById('todo-item-template')
+                            .innerHTML.replace(/\{\{ title \}\}/g, function () {
+                                return ctx.options.title
+                            });
+        },
+
+        events: {
+            '.toggle:change': 'onStateChange',
+            'label:dblclick': 'onEditTitle',
+            '.edit:blur': 'onDoneEditingTitle',
+            '.edit:keyup': 'onTitleChange',
+            'form:submit': 'onDoneEditingTitle',
+            '.destroy:click': 'destroy'
+        },
+
+        render: function () {
+            this.el.classList.add('active');
+            _super.render.apply(this, arguments);
+            return this;
+        },
+
+        onEditTitle: function () {
+            this.el.classList.add('editing');
+            var input = this.find('.edit');
+            input.selectionStart = input.selectionEnd = this.options.title.length;
+        },
+
+        onTitleChange: function (e, input) {
+            this.options.title = input.value;
+        },
+
+        onDoneEditingTitle: function (event) {
+            event.preventDefault();
+            this.el.classList.remove('editing');
+            this.find('label.view').innerHTML = this.options.title;
+        },
+
+        onStateChange: function (event, input) {
+            this._update(input.checked);
+        },
+
+        select: function () {
+            this.find('.toggle').checked = true;
+            this._update(true);
+        },
+
+        deselect: function () {
+            this.find('.toggle').checked = false;
+            this._update(false);
+        },
+
+        _update: function (done) {
+
+            // no change required
+            if (this.isComplete() === done) {
+                return;
+            }
+
+            this.el.classList[done ? 'add' : 'remove']('completed');
+
+            this.emit('status-change', {
+                completed: done
+            });
+        },
+
+        isComplete: function () {
+            return this.el.classList.contains('completed');
+        }
+
+    });
+
+    components.bindEvents();
+    components.parse();
+
+</script>
+</body>
+</html>
