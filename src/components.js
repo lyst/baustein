@@ -2,34 +2,41 @@
 
     var win = window;
     var doc = document;
+
+    // storage
     var components = {};
     var componentClasses = {};
     var componentInstances = {};
+    var globalHandlers = {};
+
     var componentId = 1;
-    var addEventListener = 'addEventListener';
+
+    // strings for bracket notation access to help minifier
     var prototype = 'prototype';
     var setAttribute = 'setAttribute';
     var getAttribute = 'getAttribute';
     var parentElement = 'parentElement';
     var appendChild = 'appendChild';
     var removeChild = 'removeChild';
-    var length = 'length';
     var createElement = 'createElement';
-    var dataComponentNameAttribute = 'data-component-name';
-    var dataComponentIdAttribute = 'data-component-id';
     var dataPrefix = 'data-';
+    var dataComponentNameAttribute = dataPrefix + 'component-name';
+    var dataComponentIdAttribute = dataPrefix + 'component-id';
     var matchesSelector = 'MatchesSelector';
     var call = 'call';
-    var el = 'el';
-    var globalHandlers = {};
+    var elProp = 'el';
+    var lengthProp = 'length';
+    var nameProp = 'name';
+
+    // prototype method shorthands
     var slice = [].slice;
     var toString = {}.toString;
-    var attributeNameRegExp = /-(\w)/g;
-    var tempEl = doc[createElement]('div');
 
-    var attributeNameReplacer = function (match, letter) {
-        return letter.toUpperCase();
-    };
+    // regex for camel casing attribute names
+    var attributeNameRegExp = /-(\w)/g;
+
+    // temp element needed for Element.prototype.matches fallback
+    var tempEl = doc[createElement]('div');
 
     /**
      * Map of 'standard' events to their equivalent 'pointerevent'
@@ -193,18 +200,27 @@
 
         var args = slice[call](arguments, 2);
 
-        for (var i = 0, l = components[length]; i < l; i++) {
+        for (var i = 0, l = components[lengthProp]; i < l; i++) {
             components[i][method].apply(components[i], args);
         }
 
         return this;
     };
 
+    /**
+     * Given an element returns an object containing all data-* attributes
+     * except for data-component-name and data-component-id.
+     *
+     * Runs all values through JSON.parse() so it is possible to pass
+     * structured data to component instances through data-* attributes.
+     * @param {HTMLElement} el
+     * @returns {Object}
+     */
     var parseDataAttributes = function (el) {
 
         var result = {};
         var attrs = el.attributes;
-        var l = attrs[length];
+        var l = attrs[lengthProp];
         var i = 0;
         var attr;
         var name;
@@ -212,14 +228,17 @@
 
         for (; i < l; i++) {
             attr = attrs[i];
-            name = attr.name;
+            name = attr[nameProp];
 
+            // ignore non-data-* attributes and the component name and id
             if (name.indexOf(dataPrefix) !== 0 ||
                 name === dataComponentIdAttribute ||
                 name === dataComponentNameAttribute) {
                 continue;
             }
 
+            // run everything through JSON.parse().
+            // If it fails to pass just assume it isn't meant to.
             try {
                 value = JSON.parse(attr.value);
             }
@@ -227,14 +246,24 @@
                 value = attr.value;
             }
 
-            name = attr.name.replace(dataPrefix, '')
-                            .replace(attributeNameRegExp, attributeNameReplacer);
+            // camel-case the attribute name minus the 'data-' prefix
+            name = attr[nameProp].replace(dataPrefix, '')
+                                 .replace(attributeNameRegExp, attributeNameReplacer);
 
             result[name] = value;
         }
 
-
         return result;
+    };
+
+    /**
+     * Function used when camel casing  attribute names.
+     * @param {String} match
+     * @param {String} letter
+     * @returns {string}
+     */
+    var attributeNameReplacer = function (match, letter) {
+        return letter.toUpperCase();
     };
 
     /**
@@ -261,7 +290,7 @@
      * @returns {boolean}
      */
     var isFunction  = function (fn) {
-        return toString.call(fn) === '[object Function]';
+        return toString[call](fn) === toString[call](toString);
     };
 
     /**
@@ -270,7 +299,7 @@
      * @returns {boolean}
      */
     var isString = function (str) {
-        return toString.call(str) === '[object String]';
+        return toString[call](str) === toString[call]('');
     };
 
     /**
@@ -292,9 +321,9 @@
             }
         }
 
-        this[el] = element;
+        this[elProp] = element;
         this._id = componentId++;
-        element[setAttribute](dataComponentNameAttribute, this.name);
+        element[setAttribute](dataComponentNameAttribute, this[nameProp]);
         element[setAttribute](dataComponentIdAttribute, this._id);
 
         componentInstances[this._id] = this;
@@ -334,14 +363,14 @@
         render: function () {
 
             if (isFunction(this.template)) {
-                this[el].innerHTML = this.template(this);
+                this[elProp].innerHTML = this.template(this);
             }
 
             if (isString(this.template)) {
-                this[el].innerHTML = this.template;
+                this[elProp].innerHTML = this.template;
             }
 
-            parse(this[el]);
+            parse(this[elProp]);
             return this;
         },
 
@@ -370,7 +399,7 @@
 
             if (isElement(element) && isElement(this.el)) {
                 this.beforeInsert();
-                element[appendChild](this[el]);
+                element[appendChild](this[elProp]);
                 this.onInsert();
                 this.emit('inserted');
             }
@@ -397,19 +426,19 @@
         remove: function (chain) {
 
             // cannot be removed if no element or no parent element
-            if (!this[el] || !this[el][parentElement]) {
+            if (!this[elProp] || !this[elProp][parentElement]) {
                 return this;
             }
 
             // get the chain of parent components if not passed
-            chain = chain || parentComponents(this[el], true);
+            chain = chain || parentComponents(this[elProp], true);
 
             // get all the child Components and invoke beforeRemove
-            var children = parse(this[el]);
+            var children = parse(this[elProp]);
             invoke(children, 'beforeRemove');
 
             // actually remove the element
-            this[el][parentElement][removeChild](this[el]);
+            this[elProp][parentElement][removeChild](this[elProp]);
 
             // invoke onRemove and emit remove event
             invoke(children, 'onRemove');
@@ -443,19 +472,19 @@
             }
 
             // get the parent chain of Components
-            var chain = parentComponents(this[el], true);
+            var chain = parentComponents(this[elProp], true);
 
             // invoke remove passing the chain
             this.remove(chain);
 
             // invoke before beforeDestroy on all child Components
-            invoke(parse(this[el]), 'beforeDestroy');
+            invoke(parse(this[elProp]), 'beforeDestroy');
 
             // emit the destroy event passing the chain
             this.emit('destroy', null, chain);
 
             // destroy everything
-            this[el] = null;
+            this[elProp] = null;
             delete componentInstances[this._id];
             return null;
         },
@@ -482,7 +511,7 @@
          * @returns {HTMLElement[]}
          */
         findAll: function (selector) {
-            return this[el] ? qsa(this[el], selector) : [];
+            return this[elProp] ? qsa(this[elProp], selector) : [];
         },
 
         /**
@@ -492,7 +521,7 @@
          * @returns {HTMLElement|Null}
          */
         find: function (selector) {
-            return this[el] ? this[el].querySelector(selector) : null;
+            return this[elProp] ? this[elProp].querySelector(selector) : null;
         },
 
         /**
@@ -570,12 +599,12 @@
 
         var target = event.target;
         var targetIsComponent = isComponent(target);
-        var targetComponentName = targetIsComponent ? target.name : null;
+        var targetComponentName = targetIsComponent ? target[nameProp] : null;
         var type = event.type;
         var component, events, delegateElement, key, selector, eventType, parts, method;
 
         chain = slice.call(chain || parentComponents(
-            targetIsComponent ? target[el] : target, targetIsComponent
+            targetIsComponent ? target[elProp] : target, targetIsComponent
         ));
 
         while (chain.length) {
@@ -590,8 +619,8 @@
             for (key in events) {
 
                 parts = key.split(':');
-                selector = parts[length] > 1 ? parts[0] : null;
-                eventType = parts[length] > 1 ? parts[1] : parts[0];
+                selector = parts[lengthProp] > 1 ? parts[0] : null;
+                eventType = parts[lengthProp] > 1 ? parts[1] : parts[0];
                 method = events[key];
 
                 if (eventType === type || pointerEventsMap[type] === eventType) {
@@ -626,22 +655,14 @@
 
         }
 
-        invokeGlobalHandlers(event);
-    };
-
-    /**
-     * Invokes any global handlers that have been bound for the given event.
-     * @param {Event} event
-     */
-    var invokeGlobalHandlers = function (event) {
-
+        // global handlers
         var handlers = globalHandlers[event.type] || globalHandlers[pointerEventsMap[event.type]];
 
         if (!handlers) {
             return;
         }
 
-        for (var i = 0, l = handlers[length]; i < l; i++) {
+        for (var i = 0, l = handlers[lengthProp]; i < l; i++) {
             handlers[i].fn[call](handlers[i].ctx, event, doc.body);
         }
     };
@@ -652,7 +673,7 @@
      * @returns {Component[]}
      */
     var parse = components.parse = function (root) {
-        root = arguments[length] === 1 ? root : doc.body;
+        root = arguments[lengthProp] === 1 ? root : doc.body;
 
         if (!root) {
             return [];
@@ -663,7 +684,7 @@
 
         var result = [];
         var i = 0;
-        var l = els[length];
+        var l = els[lengthProp];
         var component;
 
         for (; i < l; i++) {
@@ -688,7 +709,7 @@
 
         if (toString[call](name) === '[object Object]') {
             impl = name;
-            name = impl.name;
+            name = impl[nameProp];
         }
 
         if (componentClasses[name]) {
@@ -705,7 +726,7 @@
         };
         Surrogate[prototype] = Component[prototype];
         Constructor[prototype] = new Surrogate();
-        Constructor[prototype].name = name;
+        Constructor[prototype][nameProp] = name;
 
         for (var key in impl) {
             Constructor[prototype][key] = impl[key];
@@ -739,7 +760,7 @@
             'change'
 
         ].forEach(function (event, i) {
-            doc.body[addEventListener](event, handleEvent, i > 8);
+            doc.body.addEventListener(event, handleEvent, i > 8);
         });
 
     };
