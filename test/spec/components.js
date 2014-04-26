@@ -68,16 +68,33 @@ describe('components', function () {
             expect(el.getAttribute('data-component-name')).to.eql(component.name);
         });
 
-        it('should contain an events object only if one was defined', function () {
-            var c = new Component();
-            expect(c.events).to.equal(undefined);
+        it('should save passed options', function () {
 
-            var events = {};
-            var C = components.register(createComponentName(), {
-                events: events
+            var options = {
+                one: 'one',
+                two: 2,
+                three: [1,2,3]
+            };
+            var c = new Component(null, options);
+            expect(c.options).to.eql(options);
+
+        });
+
+        it('should parse data attributes from the root element to get options', function () {
+
+            var el = document.createElement('div');
+            el.setAttribute('data-foo', 'foo');
+            el.setAttribute('data-bar', JSON.stringify({key: 'value'}));
+            el.setAttribute('data-baz-bob', 5);
+
+            expect(new Component(el).options).to.eql({
+                foo: 'foo',
+                bar: {
+                    key: 'value'
+                },
+                bazBob: 5
             });
-            c = new C();
-            expect(c).to.have.property('events', events);
+
         });
 
         describe('#init()', function () {
@@ -121,6 +138,73 @@ describe('components', function () {
                 expect(c.remove()).to.be.ok();
             });
 
+            it('should call beforeRemove() before removing element from parent', function () {
+                var el = document.createElement('div');
+                var def = {
+                    beforeRemove: function () {
+                        expect(this.el.parentElement).to.equal(el);
+                    }
+                };
+                var C = components.register(createComponentName(), def);
+                var c = new C();
+                el.appendChild(c.el);
+                c.remove();
+            });
+
+            it('should call onRemove() after removing element from parent', function () {
+                var el = document.createElement('div');
+                var def = {
+                    onRemove: function () {
+                        expect(this.el.parentElement).to.equal(null);
+                    }
+                };
+                var C = components.register(createComponentName(), def);
+                var c = new C();
+                el.appendChild(c.el);
+                c.remove();
+            });
+
+            it('should emit the "remove" event', function () {
+
+                var C = components.register(createComponentName());
+
+                var events = {};
+                events[C.prototype.name + ':remove'] = 'removeEventHandler';
+
+                var def = {
+                    events: events,
+                    removeEventHandler: sinon.spy()
+                };
+
+                // this is a component that is listening for the
+                // 'destroy' event from the C component
+                var C2 = components.register(createComponentName(), def);
+
+                // set up component hierarchy
+                var c1 = new C2();
+                var c2 = new C2();
+                var c3 = new C2();
+                var c4 = new C();
+                c3.el.appendChild(c4.el);
+                c2.el.appendChild(c3.el);
+                c1.el.appendChild(c2.el);
+
+                // assert the handler has not been called
+                expect(def.removeEventHandler.callCount).to.equal(0);
+
+                // destroy the inner most child element
+                c4.remove();
+
+                // assert handler was called correct number of times
+                expect(def.removeEventHandler.callCount).to.equal(3);
+
+                // check event bubbled up the dom firing on components in the correct order
+                [c3, c2, c1].forEach(function (c, i) {
+                    expect(def.removeEventHandler.getCall(i).calledOn(c)).to.be.ok();
+                });
+
+            });
+
         });
 
         describe('#destroy()', function () {
@@ -134,6 +218,110 @@ describe('components', function () {
                 expect(c.destroy()).to.equal(null);
                 expect(document.getElementById('el')).to.equal(null);
                 expect(c.el).to.equal(null);
+            });
+
+            it('should call beforeDestroy() on itself and all child components', function () {
+
+                var def = {
+                    beforeDestroy: sinon.spy()
+                };
+                var C = components.register(createComponentName(), def);
+
+                var c1 = new C();
+                var c2 = new C();
+                var c3 = new C();
+
+                c2.el.appendChild(c3.el);
+                c1.el.appendChild(c2.el);
+
+                c1.destroy();
+                expect(def.beforeDestroy.callCount).to.equal(3);
+            });
+
+            it('should emit the "destroy" event', function () {
+
+                var C = components.register(createComponentName());
+
+                var events = {};
+                events[C.prototype.name + ':destroy'] = 'destroyEventHandler';
+
+                var def = {
+                    events: events,
+                    destroyEventHandler: sinon.spy()
+                };
+
+                // this is a component that is listening for the
+                // 'destroy' event from the C component
+                var C2 = components.register(createComponentName(), def);
+
+                // set up component hierarchy
+                var c1 = new C2();
+                var c2 = new C2();
+                var c3 = new C2();
+                var c4 = new C();
+                c3.el.appendChild(c4.el);
+                c2.el.appendChild(c3.el);
+                c1.el.appendChild(c2.el);
+
+                // assert the handler has not been called
+                expect(def.destroyEventHandler.callCount).to.equal(0);
+
+                // destroy the inner most child element
+                c4.destroy();
+
+                // assert handler was called correct number of times
+                expect(def.destroyEventHandler.callCount).to.equal(3);
+
+                // check event bubbled up the dom firing on components in the correct order
+                [c3, c2, c1].forEach(function (c, i) {
+                    expect(def.destroyEventHandler.getCall(i).calledOn(c)).to.be.ok();
+                });
+            });
+
+            it('should return null if the component has already been destroyed', function () {
+                var c = new Component();
+                c.destroy();
+                expect(c.destroy()).to.equal(null);
+            });
+
+        });
+
+        describe('#render()', function () {
+
+            describe('when the template property is a string', function () {
+
+                it('should use the template property "as is"', function () {
+
+                    var html = '<span>Hello</span> <span>World</span>';
+
+                    var C = components.register(createComponentName(), {
+                        template: html
+                    });
+
+                    expect(new C().el.innerHTML).to.equal(html);
+
+                });
+
+            });
+
+            describe('when the template property is a function', function () {
+
+                it('should invoke the function passing "this" as the first arguments', function () {
+
+                    var spy = sinon.spy();
+
+                    var C = components.register(createComponentName(), {
+                        template: function (ctx) {
+                            return '<span>' + ctx.options.text + '</span>';
+                        }
+                    });
+
+                    var actual = new C(null, {text: 'Hello world'}).el.innerHTML;
+                    var expected = '<span>Hello world</span>';
+
+                    expect(actual).to.equal(expected);
+                });
+
             });
 
         });
@@ -150,17 +338,6 @@ describe('components', function () {
                 var root = document.createElement('div');
                 c.appendTo(root);
                 expect(root.children[0]).to.equal(c.el);
-            });
-
-        });
-
-         describe('#appendTo(component)', function () {
-
-            it('should append itself to the component', function () {
-                var c = new Component();
-                var root = new Component();
-                c.appendTo(root);
-                expect(root.el.children[0]).to.equal(c.el);
             });
 
         });
@@ -209,6 +386,83 @@ describe('components', function () {
 
             it('should do nothing if first argument is not valid', function () {
                 expect(new Component().invoke(null, 'someMethod')).to.be.ok();
+            });
+
+        });
+
+        describe('#find(selector)', function () {
+
+            it('should return the element that matches the selector', function () {
+                var c = new Component();
+                c.el.innerHTML = '<span class="outer"><p><span class="inner">select me</span></p></span>';
+                expect(c.find('.outer .inner').innerHTML).to.equal('select me');
+            });
+
+            it('should return null if no element matches the selector or the component has been destroyed', function () {
+                var c = new Component();
+                expect(c.find('.does-not-exist')).to.equal(null);
+                c.destroy();
+                expect(c.find('.does-not-exist')).to.equal(null);
+            });
+
+        });
+
+        describe('#findAll(selector)', function () {
+
+            it('should return all elements that match the selector', function () {
+                var c = new Component();
+                c.el.innerHTML = '<p class="text"></p><p class="text"></p><p class="text"></p><p class="text"></p>';
+                expect(c.findAll('.text')).to.have.length(4);
+                expect(c.findAll('.text')).to.be.an(Array);
+            });
+
+            it('should return an empty array if no elements match the selector or the component has been destroyed', function () {
+                var c = new Component();
+                expect(c.findAll('.does-not-exist')).to.have.length(0);
+                expect(c.findAll('.does-not-exist')).to.be.an(Array);
+                c.destroy();
+                expect(c.findAll('.does-not-exist')).to.have.length(0);
+                expect(c.findAll('.does-not-exist')).to.be.an(Array);
+            });
+
+        });
+
+        describe('#findComponent(name)', function () {
+
+            it('should return the first child component with the given name', function () {
+                var C = components.register(createComponentName());
+                var c1 = new Component();
+                var c2 = new C();
+
+                c1.el.appendChild(c2.el);
+                expect(c1.findComponent(c2.name)).to.equal(c2);
+            });
+
+            it('should return null if no component with the given name exists', function () {
+                var c = new Component();
+                expect(c.findComponent('foobar')).to.equal(null);
+            });
+
+        });
+
+        describe('#findAllComponents(name)', function () {
+
+            it('should return an array of all components that match the given name', function () {
+
+                var C = components.register(createComponentName());
+
+                var c1 = new Component();
+                var c2 = new C();
+                var c3 = new C();
+                var c4 = new C();
+
+                c1.el.appendChild(c2.el);
+                c1.el.appendChild(c3.el);
+                c1.el.appendChild(c4.el);
+
+                expect(c1.findAllComponents(c2.name)).to.have.length(3);
+                expect(c1.findAllComponents(c2.name)).to.eql([c2, c3, c4]);
+
             });
 
         });

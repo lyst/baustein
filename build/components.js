@@ -17,13 +17,19 @@
     var createElement = 'createElement';
     var dataComponentNameAttribute = 'data-component-name';
     var dataComponentIdAttribute = 'data-component-id';
+    var dataPrefix = 'data-';
     var matchesSelector = 'MatchesSelector';
     var call = 'call';
     var el = 'el';
     var globalHandlers = {};
     var slice = [].slice;
     var toString = {}.toString;
+    var attributeNameRegExp = /-(\w)/g;
     var tempEl = doc[createElement]('div');
+
+    var attributeNameReplacer = function (match, letter) {
+        return letter.toUpperCase();
+    };
 
     /**
      * Map of 'standard' events to their equivalent 'pointerevent'
@@ -194,6 +200,43 @@
         return this;
     };
 
+    var parseDataAttributes = function (el) {
+
+        var result = {};
+        var attrs = el.attributes;
+        var l = attrs[length];
+        var i = 0;
+        var attr;
+        var name;
+        var value;
+
+        for (; i < l; i++) {
+            attr = attrs[i];
+            name = attr.name;
+
+            if (name.indexOf(dataPrefix) !== 0 ||
+                name === dataComponentIdAttribute ||
+                name === dataComponentNameAttribute) {
+                continue;
+            }
+
+            try {
+                value = JSON.parse(attr.value);
+            }
+            catch (e) {
+                value = attr.value;
+            }
+
+            name = attr.name.replace(dataPrefix, '')
+                            .replace(attributeNameRegExp, attributeNameReplacer);
+
+            result[name] = value;
+        }
+
+
+        return result;
+    };
+
     /**
      * Returns true if component is an instance of Component.
      * @param component
@@ -241,7 +284,7 @@
             element = this.createRootElement();
         }
 
-        this.options = {};
+        this.options = parseDataAttributes(element);
 
         if (options) {
             for (var key in options) {
@@ -319,85 +362,19 @@
         },
 
         /**
-         * Appends either an element or another Component into this component.
-         * @param {HTMLElement|Component} target
-         * @returns {Component}
-         */
-        appendTo: function (target) {
-
-            if (!target) {
-                return this;
-            }
-
-            if (isComponent(target)) {
-                target.appendComponent(this);
-            }
-
-            if (isElement(target)) {
-                this.appendToElement(target);
-            }
-
-            return this;
-        },
-
-        /**
-         * Appends this Component to the given HTMLElement.
+         * Appends this Component to an element.
          * @param {HTMLElement} element
          * @returns {Component}
          */
-        appendToElement: function (element) {
-            if (this[el] && isElement(element)) {
+        appendTo: function (element) {
+
+            if (isElement(element) && isElement(this.el)) {
+                this.beforeInsert();
                 element[appendChild](this[el]);
-            }
-            return this;
-        },
-
-        /**
-         * Append either an HTMLElement or another Component to this Component.
-         * @param {HTMLElement|Component} target
-         * @returns {Component}
-         */
-        append: function (target) {
-
-            if (!target) {
-                return this;
+                this.onInsert();
+                this.emit('inserted');
             }
 
-            if (isComponent(target)) {
-                this.appendComponent(target);
-            }
-
-            if (isElement(target)) {
-                this.appendElement(target);
-            }
-
-            return this;
-
-        },
-
-        /**
-         * Appends the given Component to this Component.
-         * @param {Component} component
-         * @returns {Component}
-         */
-        appendComponent: function (component) {
-            if (isComponent(component) && component[el] && this[el]) {
-                component.beforeInsert();
-                this[el][appendChild](component[el]);
-                component.onInsert();
-            }
-            return this;
-        },
-
-        /**
-         * Appends the given HTMLElement to this Component.
-         * @param {HTMLElement} element
-         * @returns {Component}
-         */
-        appendElement: function (element) {
-            if (this[el] && isElement(element)) {
-                this[el][appendChild](element);
-            }
             return this;
         },
 
@@ -664,7 +641,7 @@
             return;
         }
 
-        for (var i = 0, length = handlers[length]; i < length; i++) {
+        for (var i = 0, l = handlers[length]; i < l; i++) {
             handlers[i].fn[call](handlers[i].ctx, event, doc.body);
         }
     };
@@ -681,9 +658,9 @@
             return [];
         }
 
-        fromElement(root);
-
         var els = qsa(root, '[' + dataComponentNameAttribute + ']');
+        els.unshift(root);
+
         var result = [];
         var i = 0;
         var l = els[length];
