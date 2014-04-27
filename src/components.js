@@ -35,6 +35,9 @@
     // regex for camel casing attribute names
     var attributeNameRegExp = /-(\w)/g;
 
+    // regex for template interpolation
+    var templateInterpolationRegExp = /\$\{ *(.*?) *\}/g;
+
     // temp element needed for Element.prototype.matches fallback
     var tempEl = doc[createElement]('div');
 
@@ -303,6 +306,37 @@
     };
 
     /**
+     * Basic ES6 style string interpolation.
+     * @param {String} str
+     * @param {Object} data
+     * @returns {String}
+     */
+    var interpolateTemplate = function (str, data) {
+
+        return str.replace(templateInterpolationRegExp, function (match, key) {
+
+            var parts = key.split('.');
+            var value = data;
+
+            while (parts.length && value) {
+
+                key = parts.shift();
+
+                if (value.hasOwnProperty &&
+                    value.hasOwnProperty(key)) {
+                    value = value[key];
+                }
+                else {
+                    return '';
+                }
+            }
+
+            return value;
+        });
+
+    };
+
+    /**
      * Creates a new Component
      * @param el
      * @constructor
@@ -367,7 +401,7 @@
             }
 
             if (isString(this.template)) {
-                this[elProp].innerHTML = this.template;
+                this[elProp].innerHTML = interpolateTemplate(this.template, this);
             }
 
             parse(this[elProp]);
