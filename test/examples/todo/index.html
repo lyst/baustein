@@ -42,17 +42,15 @@
 
 <script type="x-template" id="todo-item-template">
     <input class="toggle view" type="checkbox">
-    <label class="view">{{ title }}</label>
+    <label class="view">${options.title}</label>
     <button class="destroy view"></button>
     <form>
-        <input class="edit" value="{{ title }}">
+        <input class="edit" value="${options.title}">
     </form>
 </script>
 
 <script src="../../../src/components.js"></script>
 <script>
-
-    var _super = components.Component.prototype;
 
     components.register('todos-app', {
 
@@ -206,12 +204,7 @@
 
         tagName: 'li',
 
-        template: function (ctx) {
-            return document.getElementById('todo-item-template')
-                            .innerHTML.replace(/\{\{ title \}\}/g, function () {
-                                return ctx.options.title
-                            });
-        },
+        template: document.getElementById('todo-item-template').innerHTML,
 
         events: {
             '.toggle:change': 'onStateChange',
@@ -222,10 +215,8 @@
             '.destroy:click': 'destroy'
         },
 
-        render: function () {
+        init: function () {
             this.el.classList.add('active');
-            _super.render.apply(this, arguments);
-            return this;
         },
 
         onEditTitle: function () {
