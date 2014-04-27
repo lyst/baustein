@@ -290,16 +290,31 @@ describe('components', function () {
 
             describe('when the template property is a string', function () {
 
-                it('should use the template property "as is"', function () {
-
-                    var html = '<span>Hello</span> <span>World</span>';
+                it('should process the string using interpolation and the component as the context', function () {
 
                     var C = components.register(createComponentName(), {
-                        template: html
+                        template: [
+                            '<p>${options.key1}</p>',
+                            '<p>${options.key2}</p>',
+                            '<p>${options.key3}</p>',
+                            '<p>${options.key4}</p>',
+                            '<p>${options.key5}</p>',
+                            '<p>${options.key6}</p>'
+                        ].join('')
                     });
 
-                    expect(new C().el.innerHTML).to.equal(html);
+                    var html = new C(null, {
+                        key1: 'string',
+                        key2: 0,
+                        key3: true,
+                        key4: false,
+                        key5: {},
+                        key6: [1,2,3]
+                    }).el.innerHTML;
 
+                    expect(html).to.equal(
+                        '<p>string</p><p>0</p><p>true</p><p>false</p><p>[object Object]</p><p>1,2,3</p>'
+                    );
                 });
 
             });
@@ -488,6 +503,11 @@ describe('components', function () {
             expect(components.register).withArgs(name).to.throwException();
         });
 
+        it('should throw an error if name is not a valid string', function () {
+            expect(components.register).withArgs(null).to.throwException();
+            expect(components.register).withArgs('').to.throwException();
+        });
+
     });
 
     describe('components.register(implementation)', function () {
@@ -507,6 +527,11 @@ describe('components', function () {
             var name = createComponentName();
             components.register({name: name});
             expect(components.register).withArgs({name: name}).to.throwException();
+        });
+
+        it('should throw an error if name is not a valid string', function () {
+            expect(components.register).withArgs({}).to.throwException();
+            expect(components.register).withArgs({name: function () {}}).to.throwException();
         });
 
     });

@@ -319,19 +319,11 @@
             var value = data;
 
             while (parts.length && value) {
-
                 key = parts.shift();
-
-                if (value.hasOwnProperty &&
-                    value.hasOwnProperty(key)) {
-                    value = value[key];
-                }
-                else {
-                    return '';
-                }
+                value = value[key];
             }
 
-            return value;
+            return value !== undefined ? value : '';
         });
 
     };
@@ -741,9 +733,13 @@
      */
     components.register = function (name, impl) {
 
-        if (toString[call](name) === '[object Object]') {
+        if (toString[call](name) === toString[call]({})) {
             impl = name;
             name = impl[nameProp];
+        }
+
+        if (!isString(name) || !name) {
+            throw Error('"' + name + '" is not a valid component name');
         }
 
         if (componentClasses[name]) {
