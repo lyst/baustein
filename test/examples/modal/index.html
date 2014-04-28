@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>component example - modal</title>
+    <link href="modal.css" rel="stylesheet">
+    <style>
+        [data-component-name="my-button"] {
+            margin: 10px;
+        }
+        [data-component-name="my-overlay"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0,0,0,0.5);
+            -webkit-transition: all 500ms ease;
+            opacity: 0;
+        }
+        [data-component-name="my-overlay"].show {
+            opacity: 1;
+        }
+        .my-overlay-content {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            width: 450px;
+            margin-left: -225px;
+            padding: 20px;
+            background-color: white;
+            border: 2px solid black;
+            -webkit-transform: translate3d(0, 100px, 0);
+            -webkit-transition: all 250ms ease;
+            -webkit-transition-delay: 250ms;
+            opacity: 0;
+        }
+        [data-component-name="my-overlay"].show .my-overlay-content {
+            -webkit-transform: translate3d(0, 0, 0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+<div data-component-name="my-app">
+
+    <button data-component-name="my-button" data-id="1">Click Me</button>
+    <button data-component-name="my-button" data-id="2">Click Me</button>
+    <button data-component-name="my-button" data-id="3">Click Me</button>
+    <button data-component-name="my-button" data-id="4">Click Me</button>
+
+</div>
+
+<script type="x-template" id="my-overlay-template">
+    <div class="my-overlay-content">
+        <p>Hello! You clicked button with id: <strong>${options.id}</strong></p>
+        <p><button class="my-overlay-close-button">Close Me</button></p>
+    </div>
+</script>
+
+
+<script src="../../../src/components.js"></script>
+<script>
+
+    components.register('my-app', {
+
+        events: {
+            'my-button:open-overlay': 'openOverlay',
+            'my-overlay:close': 'onOverlayClose'
+        },
+
+        openOverlay: function (event) {
+            var overlay = new MyOverlay(null, {
+                id: event.id
+            });
+            overlay.appendTo(this.el);
+        },
+
+        onOverlayClose: function (event) {
+
+        }
+
+    });
+
+    components.register('my-button', {
+
+        events: {
+            'click': 'onClick'
+        },
+
+        onClick: function () {
+            this.emit('open-overlay', {
+                id: this.options.id
+            });
+        }
+
+    });
+
+    var MyOverlay = components.register('my-overlay', {
+
+        template: document.getElementById('my-overlay-template').innerHTML,
+
+        events: {
+            'click': 'onBackdropClick',
+            '.my-overlay-close-button:click': 'close'
+        },
+
+        onInsert: function () {
+            requestAnimationFrame(function () {
+                this.el.classList.add('show');
+            }.bind(this));
+        },
+
+        onBackdropClick: function (event) {
+            if (event.target === this.el) {
+                this.close();
+            }
+        },
+
+        close: function () {
+            this.el.classList.remove('show');
+            setTimeout(this.remove.bind(this), 500);
+        }
+
+    });
+
+    components.bindEvents();
+    components.parse();
+
+</script>
+</body>
+</html>
