@@ -299,7 +299,8 @@ describe('components', function () {
                             '<p>${options.key3}</p>',
                             '<p>${options.key4}</p>',
                             '<p>${options.key5}</p>',
-                            '<p>${options.key6}</p>'
+                            '<p>${options.key6}</p>',
+                            '<p>${options.key7}</p>'
                         ].join('')
                     });
 
@@ -313,7 +314,7 @@ describe('components', function () {
                     }).el.innerHTML;
 
                     expect(html).to.equal(
-                        '<p>string</p><p>0</p><p>true</p><p>false</p><p>[object Object]</p><p>1,2,3</p>'
+                        '<p>string</p><p>0</p><p>true</p><p>false</p><p>[object Object]</p><p>1,2,3</p><p></p>'
                     );
                 });
 
