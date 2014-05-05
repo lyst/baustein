@@ -28,6 +28,9 @@
     var lengthProp = 'length';
     var nameProp = 'name';
 
+    // noop function for predefined methods
+    var noop = function() {};
+
     // prototype method shorthands
     var slice = [].slice;
     var toString = {}.toString;
@@ -436,14 +439,12 @@
         /**
          * Called before the Component in inserted into the DOM.
          */
-        beforeInsert: function () {
-        },
+        beforeInsert: noop,
 
         /**
          * Called after the Component is inserted into the DOM.
          */
-        onInsert: function () {
-        },
+        onInsert: noop,
 
         /**
          * Removes this component from the DOM.
@@ -475,14 +476,12 @@
         /**
          * Called before this Component is removed from the DOM.
          */
-        beforeRemove: function () {
-        },
+        beforeRemove: noop,
 
         /**
          * Called after this Component is removed from the DOM.
          */
-        onRemove: function () {
-        },
+        onRemove: noop,
 
         /**
          * Removes this Component from the DOM and deletes the instance from the instances pool.
@@ -518,8 +517,7 @@
         /**
          * Called before this Component is destroyed.
          */
-        beforeDestroy: function () {
-        },
+        beforeDestroy: noop,
 
         /**
          * In the case that this Component is created directly by invoking the constructor with
