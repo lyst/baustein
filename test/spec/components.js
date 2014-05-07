@@ -83,9 +83,9 @@ describe('components', function () {
         it('should parse data attributes from the root element to get options', function () {
 
             var el = document.createElement('div');
-            el.setAttribute('data-foo', 'foo');
-            el.setAttribute('data-bar', JSON.stringify({key: 'value'}));
-            el.setAttribute('data-baz-bob', 5);
+            el.setAttribute('data-component-option-foo', 'foo');
+            el.setAttribute('data-component-option-bar', JSON.stringify({key: 'value'}));
+            el.setAttribute('data-component-option-baz-bob', 5);
 
             expect(new Component(el).options).to.eql({
                 foo: 'foo',

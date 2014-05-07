@@ -19,9 +19,10 @@
     var appendChild = 'appendChild';
     var removeChild = 'removeChild';
     var createElement = 'createElement';
-    var dataPrefix = 'data-';
-    var dataComponentNameAttribute = dataPrefix + 'component-name';
-    var dataComponentIdAttribute = dataPrefix + 'component-id';
+    var dataPrefix = 'data-component-';
+    var dataComponentNameAttribute = dataPrefix + 'name';
+    var dataComponentIdAttribute = dataPrefix + 'id';
+    var dataComponentOptionsAttribute = dataPrefix + 'option-';
     var matchesSelector = 'MatchesSelector';
     var call = 'call';
     var elProp = 'el';
@@ -236,10 +237,8 @@
             attr = attrs[i];
             name = attr[nameProp];
 
-            // ignore non-data-* attributes and the component name and id
-            if (name.indexOf(dataPrefix) !== 0 ||
-                name === dataComponentIdAttribute ||
-                name === dataComponentNameAttribute) {
+            // ignore non data-component-option-* attributes
+            if (name.indexOf(dataComponentOptionsAttribute) !== 0) {
                 continue;
             }
 
@@ -253,7 +252,7 @@
             }
 
             // camel-case the attribute name minus the 'data-' prefix
-            name = attr[nameProp].replace(dataPrefix, '')
+            name = attr[nameProp].replace(dataComponentOptionsAttribute, '')
                                  .replace(attributeNameRegExp, attributeNameReplacer);
 
             result[name] = value;

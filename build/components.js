@@ -19,14 +19,18 @@
     var appendChild = 'appendChild';
     var removeChild = 'removeChild';
     var createElement = 'createElement';
-    var dataPrefix = 'data-';
-    var dataComponentNameAttribute = dataPrefix + 'component-name';
-    var dataComponentIdAttribute = dataPrefix + 'component-id';
+    var dataPrefix = 'data-component-';
+    var dataComponentNameAttribute = dataPrefix + 'name';
+    var dataComponentIdAttribute = dataPrefix + 'id';
+    var dataComponentOptionsAttribute = dataPrefix + 'option-';
     var matchesSelector = 'MatchesSelector';
     var call = 'call';
     var elProp = 'el';
     var lengthProp = 'length';
     var nameProp = 'name';
+
+    // noop function for predefined methods
+    var noop = function() {};
 
     // prototype method shorthands
     var slice = [].slice;
@@ -233,10 +237,8 @@
             attr = attrs[i];
             name = attr[nameProp];
 
-            // ignore non-data-* attributes and the component name and id
-            if (name.indexOf(dataPrefix) !== 0 ||
-                name === dataComponentIdAttribute ||
-                name === dataComponentNameAttribute) {
+            // ignore non data-component-option-* attributes
+            if (name.indexOf(dataComponentOptionsAttribute) !== 0) {
                 continue;
             }
 
@@ -250,7 +252,7 @@
             }
 
             // camel-case the attribute name minus the 'data-' prefix
-            name = attr[nameProp].replace(dataPrefix, '')
+            name = attr[nameProp].replace(dataComponentOptionsAttribute, '')
                                  .replace(attributeNameRegExp, attributeNameReplacer);
 
             result[name] = value;
@@ -436,14 +438,12 @@
         /**
          * Called before the Component in inserted into the DOM.
          */
-        beforeInsert: function () {
-        },
+        beforeInsert: noop,
 
         /**
          * Called after the Component is inserted into the DOM.
          */
-        onInsert: function () {
-        },
+        onInsert: noop,
 
         /**
          * Removes this component from the DOM.
@@ -475,14 +475,12 @@
         /**
          * Called before this Component is removed from the DOM.
          */
-        beforeRemove: function () {
-        },
+        beforeRemove: noop,
 
         /**
          * Called after this Component is removed from the DOM.
          */
-        onRemove: function () {
-        },
+        onRemove: noop,
 
         /**
          * Removes this Component from the DOM and deletes the instance from the instances pool.
@@ -518,8 +516,7 @@
         /**
          * Called before this Component is destroyed.
          */
-        beforeDestroy: function () {
-        },
+        beforeDestroy: noop,
 
         /**
          * In the case that this Component is created directly by invoking the constructor with
