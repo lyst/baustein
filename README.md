@@ -74,15 +74,14 @@ components.register('my-button', {
 
 
 ## DOM Events
-**components.js** uses event delegation to dispatch events to the correct component. It also abstracts away the difference between mouse and touch events by using pointer events. The following example shows how the events system works.
+**components.js** uses event delegation to dispatch events to the correct component. The following example shows how the events system works.
 
 ```js
 components.register('my-element', {
 
     events: {
         'click': 'onClick',
-        '.some-element:click': 'onSomeElementClick',
-        '.button:pointerdown': 'onButtonPointerDown'
+        '.some-element:click': 'onSomeElementClick'
     },
     
     // called whenever a click event happens on the root element

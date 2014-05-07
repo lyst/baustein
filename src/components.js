@@ -45,27 +45,39 @@
     // temp element needed for Element.prototype.matches fallback
     var tempEl = doc[createElement]('div');
 
-    /**
-     * Map of 'standard' events to their equivalent 'pointerevent'
-     * @type {object}
-     */
-    var pointerEventsMap = {
-        mousedown: 'pointerdown',
-        mousemove: 'pointermove',
-        mouseup: 'pointerup',
-        touchstart: 'pointerdown',
-        touchmove: 'pointermove',
-        touchend: 'pointerup'
+    // placeholder object for user defined mappings
+    var eventMappings = {};
+
+    // default set of events to listen to
+    // the values indicate whether or not to use useCapture
+    var allEvents = {
+        'click': false,
+        'dblclick': false,
+        'mousedown': false,
+        'mouseup': false,
+        'mousemove': false,
+        'touchstart': false,
+        'touchmove': false,
+        'touchend': false,
+        'keyup': false,
+        'keydown': false,
+        'error': true,
+        'blur': true,
+        'focus': true,
+        'scroll': true,
+        'submit': true,
+        'change': true,
+        'resize': true
     };
 
     /**
      * Wrapper for query selector all that returns proper array.
-     * @param {HTMLElement} root
+     * @param {HTMLElement} el
      * @param {String} selector
      * @returns {Array}
      */
-    var qsa = function (root, selector) {
-        return slice[call](root.querySelectorAll(selector));
+    var qsa = function (el, selector) {
+        return slice[call](el.querySelectorAll(selector));
     };
 
     /**
@@ -646,7 +658,7 @@
                 eventType = parts[lengthProp] > 1 ? parts[1] : parts[0];
                 method = events[key];
 
-                if (eventType === type || pointerEventsMap[type] === eventType) {
+                if (eventType === type || eventMappings[type] === eventType) {
 
                     if (selector) {
 
@@ -679,7 +691,7 @@
         }
 
         // global handlers
-        var handlers = globalHandlers[event.type] || globalHandlers[pointerEventsMap[event.type]];
+        var handlers = globalHandlers[event.type] || globalHandlers[eventMappings[event.type]];
 
         if (!handlers) {
             return;
@@ -691,19 +703,15 @@
     };
 
     /**
-     * Parses the given element or the body and creates Component instances.
-     * @param {HTMLElement} [root]
+     * Parses the given element or the root element and creates Component instances.
+     * @param {HTMLElement} [el]
      * @returns {Component[]}
      */
-    var parse = components.parse = function (root) {
-        root = arguments[lengthProp] === 1 ? root : doc.body;
+    var parse = components.parse = function (el) {
+        el = isElement(el) ? el : doc.body;
 
-        if (!root) {
-            return [];
-        }
-
-        var els = qsa(root, '[' + dataComponentNameAttribute + ']');
-        els.unshift(root);
+        var els = qsa(el, '[' + dataComponentNameAttribute + ']');
+        els.unshift(el);
 
         var result = [];
         var i = 0;
@@ -768,28 +776,40 @@
      */
     components.bindEvents = function () {
 
-        [
-            'click',
-            'dblclick',
-            'mousedown',
-            'mouseup',
-            'mousemove',
-            'touchstart',
-            'touchmove',
-            'touchend',
-            'keyup',
-            'keydown',
+        var key, el;
 
-            // the following events require useCapture
-            'blur',
-            'focus',
-            'submit',
-            'change'
+        for (key in allEvents) {
 
-        ].forEach(function (event, i) {
-            doc.body.addEventListener(event, handleEvent, i > 8);
-        });
+            // special case for resize and scroll event to listen on window
+            el = ['resize', 'scroll'].indexOf(key) !== -1 ? window : doc.body;
 
+            el.addEventListener(key, handleEvent, !!allEvents[key]);
+        }
+
+    };
+
+    /**
+     *
+     * @param {Object} options
+     * @param {Object} options.eventMappings
+     * @param {Object} options.additionalEvents
+     */
+    components.init = function (options) {
+
+        options = options || {};
+
+        if (options.eventMappings) {
+            eventMappings = options.eventMappings;
+        }
+
+        if (options.additionalEvents) {
+            for (var key in options.additionalEvents) {
+                allEvents[key] = options.additionalEvents[key];
+            }
+        }
+
+        components.parse();
+        components.bindEvents();
     };
 
     if (win.define && define.amd) {
