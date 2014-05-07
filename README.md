@@ -90,11 +90,7 @@ components.register('my-element', {
     // called whenever a click event happens on an element 
     // matching the selector '.some-element'
     // the second argument is the element
-    onSomeElementClick: function (event, element) {},
-    
-    // called whenever a mousedown or a touchstart event 
-    // happens on an element matching the selector '.button'
-    onButtonPointerDown: function (event, element) {}
+    onSomeElementClick: function (event, element) {}
 
 });
 ```
