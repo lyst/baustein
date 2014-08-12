@@ -45,7 +45,7 @@ describe('components', function () {
 
         it('should accept a root element if one is passed', function () {
             var el = document.createElement('div');
-            expect(new Component(el)).to.have.property('el', el);
+            expect(new Component(el).el).to.equal(el);
         });
 
         it('should allocate each instance a unique id', function () {
@@ -73,7 +73,7 @@ describe('components', function () {
             var options = {
                 one: 'one',
                 two: 2,
-                three: [1,2,3]
+                three: [1, 2, 3]
             };
             var c = new Component(null, options);
             expect(c.options).to.eql(options);
@@ -93,6 +93,44 @@ describe('components', function () {
                     key: 'value'
                 },
                 bazBob: 5
+            });
+
+        });
+
+        it('should use defaultOptions first, then data attributes, then passed options', function () {
+
+            var name = createComponentName();
+            var C = components.register(name, {
+                defaultOptions: {
+                    foo: 'default value'
+                }
+            });
+            expect(new C().options.foo).to.equal('default value');
+
+            var d = document.createElement('div');
+            d.setAttribute('data-component-option-foo', 'attribute value');
+
+            expect(new C(d).options.foo).to.equal('attribute value');
+
+            expect(new C(null, {
+                foo: 'passed value'
+            }).options.foo).to.equal('passed value');
+        });
+
+        describe('#defaultOptions()', function () {
+
+            it('can be a function and if it is then it should be called to get default options', function () {
+
+                var name = createComponentName();
+                var C = components.register(name, {
+                    defaultOptions: sinon.spy()
+                });
+
+                new C();
+                new C();
+                new C();
+
+                expect(C.prototype.defaultOptions.callCount).to.equal(3);
             });
 
         });
@@ -141,27 +179,29 @@ describe('components', function () {
             it('should call beforeRemove() before removing element from parent', function () {
                 var el = document.createElement('div');
                 var def = {
-                    beforeRemove: function () {
+                    beforeRemove: sinon.spy(function () {
                         expect(this.el.parentElement).to.equal(el);
-                    }
+                    })
                 };
                 var C = components.register(createComponentName(), def);
                 var c = new C();
-                el.appendChild(c.el);
+                c.appendTo(el);
                 c.remove();
+                expect(c.beforeRemove.callCount).to.equal(1);
             });
 
             it('should call onRemove() after removing element from parent', function () {
                 var el = document.createElement('div');
                 var def = {
-                    onRemove: function () {
+                    onRemove: sinon.spy(function () {
                         expect(this.el.parentElement).to.equal(null);
-                    }
+                    })
                 };
                 var C = components.register(createComponentName(), def);
                 var c = new C();
-                el.appendChild(c.el);
+                c.appendTo(el);
                 c.remove();
+                expect(c.onRemove.callCount).to.equal(1);
             });
 
             it('should emit the "remove" event', function () {
@@ -211,12 +251,12 @@ describe('components', function () {
 
             it('should remove the element, destroy the component instance, and return null', function () {
                 var name = createComponentName();
-                addTestHTML('<div id="el" data-component-name="' + name + '"></div>');
+                addTestHTML('<div id="test-el" data-component-name="' + name + '"></div>');
                 components.register(name);
                 components.parse();
-                var c = components.fromElement(document.getElementById('el'));
+                var c = components.fromElement(document.getElementById('test-el'));
                 expect(c.destroy()).to.equal(null);
-                expect(document.getElementById('el')).to.equal(null);
+                expect(document.getElementById('test-el')).to.equal(null);
                 expect(c.el).to.equal(null);
             });
 
@@ -288,43 +328,9 @@ describe('components', function () {
 
         describe('#render()', function () {
 
-            describe('when the template property is a string', function () {
-
-                it('should process the string using interpolation and the component as the context', function () {
-
-                    var C = components.register(createComponentName(), {
-                        template: [
-                            '<p>${options.key1}</p>',
-                            '<p>${options.key2}</p>',
-                            '<p>${options.key3}</p>',
-                            '<p>${options.key4}</p>',
-                            '<p>${options.key5}</p>',
-                            '<p>${options.key6}</p>',
-                            '<p>${options.key7}</p>'
-                        ].join('')
-                    });
-
-                    var html = new C(null, {
-                        key1: 'string',
-                        key2: 0,
-                        key3: true,
-                        key4: false,
-                        key5: {},
-                        key6: [1,2,3]
-                    }).el.innerHTML;
-
-                    expect(html).to.equal(
-                        '<p>string</p><p>0</p><p>true</p><p>false</p><p>[object Object]</p><p>1,2,3</p><p></p>'
-                    );
-                });
-
-            });
-
             describe('when the template property is a function', function () {
 
-                it('should invoke the function passing "this" as the first arguments', function () {
-
-                    var spy = sinon.spy();
+                it('should invoke the function passing "this" as the first argument', function () {
 
                     var C = components.register(createComponentName(), {
                         template: function (ctx) {
@@ -404,6 +410,24 @@ describe('components', function () {
                 expect(new Component().invoke(null, 'someMethod')).to.be.ok();
             });
 
+            it('should check that the given method exists before calling it', function () {
+
+                var spy = sinon.spy();
+                var objs = [
+                    {testMethod: spy},
+                    {testMethod: spy},
+                    {testMethod: null},
+                    {}
+                ];
+
+                // should not throw
+                expect(new Component().invoke(objs, 'testMethod')).to.be.ok();
+
+                // should have called the methods on the objects that had it
+                expect(spy.callCount).to.equal(2);
+
+            });
+
         });
 
         describe('#find(selector)', function () {
@@ -411,34 +435,23 @@ describe('components', function () {
             it('should return the element that matches the selector', function () {
                 var c = new Component();
                 c.el.innerHTML = '<span class="outer"><p><span class="inner">select me</span></p></span>';
-                expect(c.find('.outer .inner').innerHTML).to.equal('select me');
+                expect(c.find('.outer .inner')[0].innerHTML).to.equal('select me');
             });
 
-            it('should return null if no element matches the selector or the component has been destroyed', function () {
+            it('should return an empty jQuery object if no element matches the selector or the component has been destroyed', function () {
                 var c = new Component();
-                expect(c.find('.does-not-exist')).to.equal(null);
+                expect(c.find('.does-not-exist')).to.have.length(0);
                 c.destroy();
-                expect(c.find('.does-not-exist')).to.equal(null);
+                expect(c.find('.does-not-exist')).to.have.length(0);
             });
 
-        });
+            it('should only locate elements within the Component', function () {
 
-        describe('#findAll(selector)', function () {
+                addTestHTML('<div class="outside"><div class="test-component"><div class="inside"></div></div></div>');
 
-            it('should return all elements that match the selector', function () {
-                var c = new Component();
-                c.el.innerHTML = '<p class="text"></p><p class="text"></p><p class="text"></p><p class="text"></p>';
-                expect(c.findAll('.text')).to.have.length(4);
-                expect(c.findAll('.text')).to.be.an(Array);
-            });
-
-            it('should return an empty array if no elements match the selector or the component has been destroyed', function () {
-                var c = new Component();
-                expect(c.findAll('.does-not-exist')).to.have.length(0);
-                expect(c.findAll('.does-not-exist')).to.be.an(Array);
-                c.destroy();
-                expect(c.findAll('.does-not-exist')).to.have.length(0);
-                expect(c.findAll('.does-not-exist')).to.be.an(Array);
+                var c = new Component(testRoot.querySelector('.test-component'));
+                expect(c.find('.inside')).to.have.length(1);
+                expect(c.find('.outside')).to.have.length(0);
             });
 
         });
@@ -461,7 +474,7 @@ describe('components', function () {
 
         });
 
-        describe('#findAllComponents(name)', function () {
+        describe('#findComponents(name)', function () {
 
             it('should return an array of all components that match the given name', function () {
 
@@ -471,14 +484,116 @@ describe('components', function () {
                 var c2 = new C();
                 var c3 = new C();
                 var c4 = new C();
+                var arr = [c2, c3, c4];
 
                 c1.el.appendChild(c2.el);
                 c1.el.appendChild(c3.el);
                 c1.el.appendChild(c4.el);
 
-                expect(c1.findAllComponents(c2.name)).to.have.length(3);
-                expect(c1.findAllComponents(c2.name)).to.eql([c2, c3, c4]);
+                expect(c1.findComponents(c2.name)).to.have.length(3);
 
+                c1.findComponents(c2.name).forEach(function (c, i) {
+                    expect(c).to.equal(arr[i]);
+                });
+
+            });
+
+        });
+
+        describe('#getInstancesOf(name)', function () {
+
+            it('should return an array of all components that match the given name', function () {
+
+                var Component1 = components.register(createComponentName());
+                var Component2 = components.register(createComponentName());
+
+                var c1 = new Component1();
+                var c2 = new Component1();
+                var c3 = new Component2();
+                var c4 = new Component2();
+                var c5 = new Component1();
+                var arr = [c1, c2, c5];
+                var arr2 = [c3, c4];
+
+                expect(components.getInstancesOf(c1.name)).to.have.length(3);
+                expect(components.getInstancesOf(c3.name)).to.have.length(2);
+
+                components.getInstancesOf(c1.name).forEach(function (c, i) {
+                    expect(c).to.equal(arr[i]);
+                });
+
+                components.getInstancesOf(c3.name).forEach(function (c, i) {
+                    expect(c).to.equal(arr2[i]);
+                });
+
+            });
+
+        });
+
+        describe('#getInstanceOf(name)', function () {
+
+            it('should return a instance or undefined', function () {
+
+                var Component1 = components.register(createComponentName());
+
+                var c1 = new Component1();
+
+                expect(components.getInstanceOf(c1.name)).to.be.a('object');
+                expect(components.getInstanceOf(c1.name)).to.be(c1);
+                expect(components.getInstanceOf('hello')).to.be(undefined);
+
+            });
+
+            it('should return the right instance', function () {
+
+                var Component1 = components.register(createComponentName());
+                var Component2 = components.register(createComponentName());
+
+                var c1 = new Component1();
+                var c2 = new Component1();
+                var c3 = new Component2();
+                var c4 = new Component2();
+                var c5 = new Component1();
+
+                expect(components.getInstanceOf(c1.name)).to.be(c1);
+                expect(components.getInstanceOf(c4.name)).to.be(c3);
+
+            });
+
+        });
+
+        describe('#destroy(name)', function () {
+
+            it('should destroy all instances', function () {
+
+                var Component1 = components.register(createComponentName());
+                var Component2 = components.register(createComponentName());
+
+                var c1 = new Component1();
+                var c2 = new Component1();
+                var c3 = new Component2();
+                var c4 = new Component2();
+                var c5 = new Component1();
+
+                components.destroy(c1.name);
+
+                expect(components.getInstancesOf(c1.name)).to.have.length(0);
+                expect(components.getInstancesOf(c3.name)).to.have.length(2);
+
+                components.destroy(c3.name);
+
+                expect(components.getInstancesOf(c1.name)).to.have.length(0);
+                expect(components.getInstancesOf(c3.name)).to.have.length(0);
+
+            });
+
+            it('should fail silent if there are no instances', function () {
+                expect(components.destroy).withArgs('hallo').to.not.throwException();
+                expect(components.destroy).to.not.throwException();
+            });
+
+            it('should be chainable', function () {
+                expect(components.destroy()).to.be(components);
             });
 
         });
@@ -532,7 +647,8 @@ describe('components', function () {
 
         it('should throw an error if name is not a valid string', function () {
             expect(components.register).withArgs({}).to.throwException();
-            expect(components.register).withArgs({name: function () {}}).to.throwException();
+            expect(components.register).withArgs({name: function () {
+            }}).to.throwException();
         });
 
     });
@@ -546,10 +662,10 @@ describe('components', function () {
             var name3 = createComponentName();
 
             addTestHTML(
-                '<div id="first" data-component-name="' + name1 + '"></div>',
-                '<div id="second" data-component-name="' + name2 + '"><span class="outer"><span id="span-inner" class="inner"></span></span></div>',
-                '<div id="third" data-component-name="' + name1 + '"></div>',
-                '<div id="fourth" data-component-name="' + name3 + '"></div>',
+                    '<div id="first" data-component-name="' + name1 + '"></div>',
+                    '<div id="second" data-component-name="' + name2 + '"><span class="outer"><span id="span-inner" class="inner"></span></span></div>',
+                    '<div id="third" data-component-name="' + name1 + '"></div>',
+                    '<div id="fourth" data-component-name="' + name3 + '"></div>',
                 '<div id="fifth"></div>'
             );
 
@@ -601,7 +717,7 @@ describe('components', function () {
             var name = createComponentName();
 
             addTestHTML(
-                '<div data-component-name="' + name + '">',
+                    '<div data-component-name="' + name + '">',
                 '  <span class="one two"><span><span data-some-attribute><span id="target"></span></span></span></span>',
                 '</div>'
             );
@@ -658,7 +774,8 @@ describe('components', function () {
         it('should return null if the passed argument is not an element', function () {
             expect(components.fromElement(null)).to.equal(null);
             expect(components.fromElement({})).to.equal(null);
-            expect(components.fromElement(function () {})).to.equal(null);
+            expect(components.fromElement(function () {
+            })).to.equal(null);
             expect(components.fromElement('<div></div>')).to.equal(null);
         });
 

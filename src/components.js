@@ -1,113 +1,169 @@
-(function () {
+(function (root, factory) {
+
+    if (typeof define === 'function' && define.amd) {
+        // AMD. Register as an anonymous module.
+        define(factory);
+    } else {
+        // Browser globals
+        root.components = factory();
+    }
+
+}(this, function () {
 
     var win = window;
-    var doc = document;
+    var doc = win.document;
+    var slice = [].slice;
+    var filter = [].filter;
+    var map = [].map;
 
-    // storage
-    var components = {};
+    /**
+     * Map of component name -> component Class
+     * @type {Object}
+     */
     var componentClasses = {};
+
+    /**
+     * Map of component id -> component instance
+     * @type {Object}
+     */
     var componentInstances = {};
+
+    /**
+     * Map of event name -> handlers for that event
+     * @type {Object}
+     */
     var globalHandlers = {};
 
-    var componentId = 1;
+    /**
+     * Map of real event name -> mapped event name.
+     *
+     * For example to listen for both 'mousemove' and
+     * 'touchmove' events as 'pointermove' you can do:
+     *     {
+     *         mousemove: 'pointermove',
+     *         touchmove: 'pointermove'
+     *     }
+     * @type {Object}
+     */
+    var eventMappings = {};
 
-    // strings for bracket notation access to help minifier
-    var prototype = 'prototype';
-    var setAttribute = 'setAttribute';
-    var getAttribute = 'getAttribute';
-    var parentElement = 'parentElement';
-    var appendChild = 'appendChild';
-    var removeChild = 'removeChild';
-    var createElement = 'createElement';
+    /**
+     * Incrementing number used to give each component a unique id.
+     * @type {Number}
+     */
+    var nextComponentId = 1;
+
     var dataPrefix = 'data-component-';
     var dataComponentNameAttribute = dataPrefix + 'name';
     var dataComponentIdAttribute = dataPrefix + 'id';
-    var dataComponentOptionsAttribute = dataPrefix + 'option-';
-    var matchesSelector = 'MatchesSelector';
-    var call = 'call';
-    var elProp = 'el';
-    var lengthProp = 'length';
-    var nameProp = 'name';
 
-    // noop function for predefined methods
-    var noop = function() {};
-
-    // prototype method shorthands
-    var slice = [].slice;
-    var toString = {}.toString;
-
-    // regex for camel casing attribute names
-    var attributeNameRegExp = /-(\w)/g;
-
-    // regex for template interpolation
-    var templateInterpolationRegExp = /\$\{ *(.*?) *\}/g;
-
-    // temp element needed for Element.prototype.matches fallback
-    var tempEl = doc[createElement]('div');
-
-    // placeholder object for user defined mappings
-    var eventMappings = {};
-
-    // default set of events to listen to
-    // the values indicate whether or not to use useCapture
+    /**
+     * Map of event name -> flag indicating whether or not to use useCapture
+     * @type {Object}
+     */
     var allEvents = {
-        'click': false,
-        'dblclick': false,
-        'mousedown': false,
-        'mouseup': false,
-        'mousemove': false,
-        'touchstart': false,
-        'touchmove': false,
-        'touchend': false,
-        'keyup': false,
-        'keydown': false,
-        'error': true,
-        'blur': true,
-        'focus': true,
-        'scroll': true,
-        'submit': true,
-        'change': true,
-        'resize': true
+        click: false,
+        dblclick: false,
+        mousedown: false,
+        mouseup: false,
+        mousemove: false,
+        touchstart: false,
+        touchmove: false,
+        touchend: false,
+        keyup: false,
+        keydown: false,
+        error: true,
+        blur: true,
+        focus: true,
+        scroll: true,
+        submit: true,
+        change: true,
+        resize: true
     };
 
     /**
-     * Wrapper for query selector all that returns proper array.
-     * @param {HTMLElement} el
-     * @param {String} selector
-     * @returns {Array}
+     * Returns the 'inner' type of `obj`.
+     * @param {*} obj
+     * @returns {String}
      */
-    var qsa = function (el, selector) {
-        return slice[call](el.querySelectorAll(selector));
-    };
+    function type (obj) {
+        return Object.prototype.toString.call(obj).match(/\[object (.*?)\]/)[1].toLowerCase();
+    }
 
     /**
-     * Returns the nearest Component instance for the passed element.
-     * @param {HTMLElement} element
-     * @param {Boolean} [ignoreRoot]
-     * @returns {Component[]}
+     * Returns true if `obj` is an Object.
+     * @param {*} obj
+     * @returns {Boolean}
      */
-    var parentComponents = function (element, ignoreRoot) {
+    function isObject(obj) {
+        return type(obj) === 'object';
+    }
 
-        var id;
-        var result = [];
+    /**
+     * Returns true if `fn` is a function.
+     * @param fn
+     * @returns {Boolean}
+     */
+    function isFunction (fn) {
+        return type(fn) === 'function';
+    }
 
-        if (ignoreRoot) {
-            element = element && element[parentElement];
-        }
+    /**
+     * Returns true if `el` is an element.
+     * @param el
+     * @returns {Boolean}
+     */
+    function isElement (el) {
+        return el && (el.nodeType === 1 || el.nodeType === 9);
+    }
 
-        while (element && element !== doc.body) {
+    /**
+     * Returns true if `str` is a string.
+     * @param {*} str
+     * @returns {Boolean}
+     */
+    function isString (str) {
+        return type(str) === 'string';
+    }
 
-            id = element[getAttribute](dataComponentIdAttribute);
+    /**
+     * Returns `this`. Used as a placeholder method.
+     * @returns {*}
+     */
+    function noop () {
+        return this;
+    }
 
-            if (id) {
-                result.push(componentInstances[id]);
+    /**
+     * Returns a camel-cased version of `str`.
+     * @param {String} str
+     * @returns {String}
+     */
+    function toCamelCase (str) {
+        return str.replace(/\-(.)/g, function (a,b) {
+            return b.toUpperCase();
+        });
+    }
+
+    /**
+     * Mixes all arguments after `target` into `target` and returns `target`.
+     * @param {Object} target
+     * @returns {Object}
+     */
+    function extend (target) {
+
+        slice.call(arguments, 1).forEach(function (source) {
+            if (isObject(source)) {
+                for (var key in source) {
+                    if (source.hasOwnProperty(key)) {
+                        target[key] = source[key];
+                    }
+                }
             }
+        });
 
-            element = element[parentElement];
-        }
-
-        return result;
-    };
+        return target;
+    }
 
     /**
      * Returns the closest element to el that matches the given selector.
@@ -115,7 +171,7 @@
      * @param {String} selector
      * @returns {HTMLElement|Null}
      */
-    var closestSelector = function (el, selector) {
+    function closestElement (el, selector) {
 
         while (el && el !== doc.body) {
 
@@ -123,11 +179,11 @@
                 return el;
             }
 
-            el = el[parentElement];
+            el = el.parentElement;
         }
 
         return null;
-    };
+    }
 
     /**
      * Wrapper around the HTMLElement.prototype.matches
@@ -136,52 +192,65 @@
      * @param {String} selector
      * @returns {Boolean}
      */
-    var matches = function (el, selector) {
+    function matches (el, selector) {
 
-        var matchesSelector = el['webkit' + matchesSelector] ||
-            el['moz' + matchesSelector] ||
-            el['ms' + matchesSelector] ||
-            el['o' + matchesSelector] ||
+        var method = 'MatchesSelector';
+        var matchesSelector = el['webkit' + method] ||
+            el['moz' + method] ||
+            el['ms' + method] ||
+            el['o' + method] ||
             el.matchesSelector ||
             el.matches;
 
-        if (matchesSelector) {
-            return matchesSelector[call](el, selector);
+        return matchesSelector.call(el, selector);
+    }
+
+    /**
+     * Returns the nearest Component instance for the passed element.
+     * @param {HTMLElement} element
+     * @param {Boolean} [ignoreRoot] If true
+     * @returns {Component[]}
+     */
+    function parentComponents(element, ignoreRoot) {
+
+        var id;
+        var result = [];
+
+        if (ignoreRoot) {
+            element = element.parentElement;
         }
 
-        // fall back to performing a selector:
-        var match;
-        var parent = el[parentElement];
-        var temp = !parent;
+        while (element && element !== doc.body) {
 
-        if (temp) {
-            parent = tempEl;
-            parent[appendChild](el);
+            id = element.getAttribute(dataComponentIdAttribute);
+
+            if (id) {
+                result.push(componentInstances[id]);
+            }
+
+            element = element.parentElement;
         }
 
-        match = qsa(parent, selector).indexOf(el) !== -1;
-
-        if (temp) {
-            parent[removeChild](el);
-        }
-
-        return match;
-    };
+        return result;
+    }
 
     /**
      * Returns the Component instance for the passed element or null.
      * If a component instance has already been created for this element
      * then it is returned, if not a new instance of the correct Component is created.
-     * @param {HTMLElement} el
+     * @param {HTMLElement|jQuery} el
      */
-    var fromElement = components.fromElement = function (el) {
+    function fromElement(el) {
+
+        var name;
+        var id;
 
         if (!isElement(el)) {
             return null;
         }
 
-        var name = el[getAttribute](dataComponentNameAttribute);
-        var id = el[getAttribute](dataComponentIdAttribute);
+        name = el.getAttribute(dataComponentNameAttribute);
+        id = el.getAttribute(dataComponentIdAttribute);
 
         // if no name then it is not a component
         if (!name) {
@@ -199,7 +268,7 @@
 
         // create a new Component instance
         return new componentClasses[name](el);
-    };
+    }
 
     /**
      * Given an array of Component instances invokes 'method' on each one.
@@ -207,7 +276,11 @@
      * @param {Component[]|Component} components
      * @param {String} method
      */
-    var invoke = function (components, method) {
+    function invoke(components, method) {
+
+        var args = slice.call(arguments, 2);
+        var i = 0;
+        var length;
 
         if (isComponent(components)) {
             components = [components];
@@ -217,14 +290,14 @@
             return this;
         }
 
-        var args = slice[call](arguments, 2);
-
-        for (var i = 0, l = components[lengthProp]; i < l; i++) {
-            components[i][method].apply(components[i], args);
+        for (length = components.length; i < length; i++) {
+            if (isFunction(components[i][method])) {
+                components[i][method].apply(components[i], args);
+            }
         }
 
         return this;
-    };
+    }
 
     /**
      * Given an element returns an object containing all data-* attributes
@@ -235,153 +308,315 @@
      * @param {HTMLElement} el
      * @returns {Object}
      */
-    var parseDataAttributes = function (el) {
+    function parseDataAttributes(el) {
 
         var result = {};
-        var attrs = el.attributes;
-        var l = attrs[lengthProp];
-        var i = 0;
-        var attr;
         var name;
         var value;
 
-        for (; i < l; i++) {
-            attr = attrs[i];
-            name = attr[nameProp];
+        if (!isElement(el)) {
+            return result;
+        }
 
-            // ignore non data-component-option-* attributes
-            if (name.indexOf(dataComponentOptionsAttribute) !== 0) {
-                continue;
+        for (var i = 0; i < el.attributes.length; i++) {
+
+            name = toCamelCase(el.attributes[i].name);
+
+            if (name.substring(0, 19) === 'dataComponentOption') {
+
+                name = name[19].toLowerCase() + name.substring(20);
+                value = el.attributes[i].value;
+
+                try {
+                    value = JSON.parse(value);
+                }
+                catch (e) {
+                }
+
+                result[name] = value;
+
             }
 
-            // run everything through JSON.parse().
-            // If it fails to pass just assume it isn't meant to.
-            try {
-                value = JSON.parse(attr.value);
-            }
-            catch (e) {
-                value = attr.value;
-            }
-
-            // camel-case the attribute name minus the 'data-' prefix
-            name = attr[nameProp].replace(dataComponentOptionsAttribute, '')
-                                 .replace(attributeNameRegExp, attributeNameReplacer);
-
-            result[name] = value;
         }
 
         return result;
-    };
-
-    /**
-     * Function used when camel casing  attribute names.
-     * @param {String} match
-     * @param {String} letter
-     * @returns {string}
-     */
-    var attributeNameReplacer = function (match, letter) {
-        return letter.toUpperCase();
-    };
+    }
 
     /**
      * Returns true if component is an instance of Component.
      * @param component
      * @returns {boolean}
      */
-    var isComponent = function (component) {
+    function isComponent(component) {
         return component instanceof Component;
-    };
+    }
 
     /**
-     * Returns true if element is an HTMLElement.
-     * @param element
-     * @returns {*|boolean}
+     * Handles all events and invokes Component handlers
+     * based on their events object.
+     * @param {Event} event
+     * @param {Component[]} [componentsChain] Only used internally when a chain of
+     *                                        Components is already available.
      */
-    var isElement = function (element) {
-        return element && element.nodeType === 1;
-    };
+    function handleEvent(event, componentsChain) {
 
-    /**
-     * Returns true if fn is a function, otherwise false.
-     * @param fn
-     * @returns {boolean}
-     */
-    var isFunction  = function (fn) {
-        return toString[call](fn) === toString[call](toString);
-    };
+        var target = event.target;
+        var targetIsComponent = isComponent(target);
+        var targetComponentName = targetIsComponent ? target.name : null;
+        var type = event.type;
+        var component, events, closest, key, selector, eventType, parts, method, handlers, i, length;
 
-    /**
-     * Returns true if str is a string, otherwise false.
-     * @param str
-     * @returns {boolean}
-     */
-    var isString = function (str) {
-        return toString[call](str) === toString[call]('');
-    };
+        componentsChain = componentsChain ? slice.call(componentsChain) : parentComponents(
+            targetIsComponent ? target.el : target, targetIsComponent
+        );
 
-    /**
-     * Basic ES6 style string interpolation.
-     * @param {String} str
-     * @param {Object} data
-     * @returns {String}
-     */
-    var interpolateTemplate = function (str, data) {
+        while (componentsChain.length) {
 
-        return str.replace(templateInterpolationRegExp, function (match, key) {
+            component = componentsChain.shift();
+            events = component.events;
 
-            var parts = key.split('.');
-            var value = data;
-
-            while (parts.length && value) {
-                key = parts.shift();
-                value = value[key];
+            if (!events) {
+                continue;
             }
 
-            return value !== undefined ? value : '';
+            for (key in events) {
+
+                parts = key.split(':');
+                selector = parts.length > 1 ? parts[0] : null;
+                eventType = parts.length > 1 ? parts[1] : parts[0];
+                method = events[key];
+
+                // if event doesn't match then go to next component
+                if (eventType !== type && eventMappings[type] !== eventType) {
+                    continue;
+                }
+
+                // if there is no selector just invoke the handler and move on
+                if (!selector) {
+                    component[method](event);
+                    continue;
+                }
+
+                // if this is a component event then the
+                // selector just needs to match the component name
+                if (targetIsComponent) {
+
+                    if (selector === targetComponentName) {
+                        component[method](event);
+                    }
+
+                }
+                else {
+
+                    closest = closestElement(target, selector);
+
+                    if (closest) {
+                        component[method](event, closest);
+                    }
+
+                }
+
+            }
+
+        }
+
+        // global handlers
+        handlers = globalHandlers[event.type] || globalHandlers[eventMappings[event.type]];
+
+        if (!handlers) {
+            return;
+        }
+
+        for (i = 0, length = handlers.length; i < length; i++) {
+            handlers[i].fn.call(handlers[i].ctx, event, doc.body);
+        }
+    }
+
+    /**
+     * Parses the given element or the root element and creates Component instances.
+     * @param {HTMLElement|jQuery} [root]
+     * @returns {Component[]}
+     */
+    function parse(root) {
+
+        // allow jQuery, DOM element, or nothing
+        root = isElement(root) ? root : doc.body;
+
+        var els = slice.call(root.querySelectorAll('[' + dataComponentNameAttribute + ']'));
+        var component;
+
+        // add the root element to the front
+        els.unshift(root);
+
+        return els.reduce(function (result, el) {
+
+            component = fromElement(el);
+
+            if (component) {
+                result.push(component);
+            }
+
+            return result;
+
+        }, []);
+    }
+
+    /**
+     * Registers a new Component.
+     * @param {String|Object} name
+     * @param {Object} [impl] The implementation methods / properties.
+     * @returns {Function}
+     */
+    function register(name, impl) {
+
+        var F, Surrogate;
+
+        if (isObject(name)) {
+            impl = name;
+            name = impl.name;
+        }
+
+        if (!isString(name) || !name) {
+            throw Error('"' + name + '" is not a valid component name');
+        }
+
+        if (componentClasses[name]) {
+            throw Error('A component called ' + name + ' already exists');
+        }
+
+        impl = impl || {};
+
+        F = function () {
+            Component.apply(this, arguments);
+        };
+
+        Surrogate = function () {};
+        Surrogate.prototype = Component.prototype;
+        F.prototype = new Surrogate();
+        F.prototype.name = name;
+
+        extend(F.prototype, impl);
+
+        componentClasses[name] = F;
+        return F;
+    }
+
+    /**
+     * Binds all events to the body.
+     */
+    function bindEvents() {
+
+        var key, el;
+
+        for (key in allEvents) {
+
+            // special case for resize and scroll event to listen on window
+            el = ['resize', 'scroll'].indexOf(key) !== -1 ? window : doc.body;
+
+            el.addEventListener(key, handleEvent, !!allEvents[key]);
+        }
+
+    }
+
+    /**
+     * @param {Object} options
+     * @param {Object} options.eventMappings
+     * @param {Object} options.additionalEvents
+     */
+    function init(options) {
+
+        options = options || {};
+
+        if (options.eventMappings) {
+            eventMappings = options.eventMappings;
+        }
+
+        extend(allEvents, options.additionalEvents);
+
+        parse();
+        bindEvents();
+    }
+
+    /**
+     * @param {string} name
+     * @returns {Object}
+     */
+    function getInstanceOf(name) {
+        return getInstancesOf(name)[0];
+    }
+
+    /**
+     * @param {string} name
+     * @param {function} filter
+     * @returns {Array}
+     */
+    function getInstancesOf(name) {
+
+        var result = [];
+
+        for (var key in componentInstances) {
+            if (componentInstances[key] && componentInstances[key].name === name) {
+                result.push(componentInstances[key]);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * @param {string} name
+     * @returns {components|Component}
+     */
+    function destroy(name) {
+        getInstancesOf(name).forEach(function(instance) {
+            instance.destroy();
         });
 
-    };
+        return this;
+    }
 
     /**
      * Creates a new Component
-     * @param el
+     * @param element
+     * @param options
      * @constructor
      */
-    var Component = components.Component = function (element, options) {
+    function Component (element, options) {
 
         if (!element) {
             element = this.createRootElement();
         }
 
-        this.options = parseDataAttributes(element);
-
-        if (options) {
-            for (var key in options) {
-                this.options[key] = options[key];
-            }
-        }
-
-        this[elProp] = element;
-        this._id = componentId++;
-        element[setAttribute](dataComponentNameAttribute, this[nameProp]);
-        element[setAttribute](dataComponentIdAttribute, this._id);
-
+        this._id = nextComponentId++;
         componentInstances[this._id] = this;
+
+        this.el = element;
+
+        // options are built from optional default options - this can
+        // be a property or a function that returns an object, the
+        // data-component-option attributes, and finally any options
+        // passed to the constructor
+        this.options = extend(
+            {},
+            isFunction(this.defaultOptions) ? this.defaultOptions() : this.defaultOptions,
+            parseDataAttributes(this.el),
+            options
+        );
+
+        element.setAttribute(dataComponentNameAttribute, this.name);
+        element.setAttribute(dataComponentIdAttribute, this._id);
 
         this.init();
         this.render();
-    };
+    }
 
-    Component[prototype] = {
+    Component.prototype = {
 
         name: '',
 
         tagName: 'div',
 
         /**
-         * If set to a string that string will be used as
-         * the innerHTML whenever render is called.
-         *
          * If set to a function it will be called with the
          * component as both 'this' and as the first argument.
          */
@@ -403,14 +638,19 @@
         render: function () {
 
             if (isFunction(this.template)) {
-                this[elProp].innerHTML = this.template(this);
+                this.el.innerHTML = this.template(this);
+                this.parse();
             }
 
-            if (isString(this.template)) {
-                this[elProp].innerHTML = interpolateTemplate(this.template, this);
-            }
+            return this;
+        },
 
-            parse(this[elProp]);
+        /**
+         * Parses this Component and instantiates any child components
+         * @returns {Component}
+         */
+        parse: function () {
+            parse(this.el);
             return this;
         },
 
@@ -432,18 +672,21 @@
 
         /**
          * Appends this Component to an element.
-         * @param {HTMLElement} element
+         * @param {HTMLElement|jQuery} el
          * @returns {Component}
          */
-        appendTo: function (element) {
+        appendTo: function (el) {
 
-            if (isElement(element) && isElement(this.el)) {
-                this.beforeInsert();
-                element[appendChild](this[elProp]);
-                this.onInsert();
-                this.emit('inserted');
+            el = isElement(el) ? el : isComponent(el) ? el.el : null;
+
+            if (!el) {
+                return this;
             }
 
+            this.beforeInsert();
+            el.appendChild(this.el);
+            this.onInsert();
+            this.emit('inserted');
             return this;
         },
 
@@ -464,19 +707,19 @@
         remove: function (chain) {
 
             // cannot be removed if no element or no parent element
-            if (!this[elProp] || !this[elProp][parentElement]) {
+            if (!this.el || !this.el.parentElement) {
                 return this;
             }
 
             // get the chain of parent components if not passed
-            chain = chain || parentComponents(this[elProp], true);
+            chain = chain || parentComponents(this.el, true);
 
             // get all the child Components and invoke beforeRemove
-            var children = parse(this[elProp]);
+            var children = parse(this.el);
             invoke(children, 'beforeRemove');
 
             // actually remove the element
-            this[elProp][parentElement][removeChild](this[elProp]);
+            this.el.parentElement.removeChild(this.el);
 
             // invoke onRemove and emit remove event
             invoke(children, 'onRemove');
@@ -502,26 +745,32 @@
          */
         destroy: function () {
 
+            var chain;
+
             // must have already been destroyed
             if (!componentInstances[this._id]) {
                 return null;
             }
 
             // get the parent chain of Components
-            var chain = parentComponents(this[elProp], true);
+            chain = parentComponents(this.el, true);
 
             // invoke remove passing the chain
             this.remove(chain);
 
             // invoke before beforeDestroy on all child Components
-            invoke(parse(this[elProp]), 'beforeDestroy');
+            invoke(parse(this.el), 'beforeDestroy');
 
             // emit the destroy event passing the chain
             this.emit('destroy', null, chain);
 
             // destroy everything
-            this[elProp] = null;
-            delete componentInstances[this._id];
+            this.el = null;
+
+            // use null assignment instead of delete
+            // as delete has performance implications
+            componentInstances[this._id] = null;
+
             return null;
         },
 
@@ -536,27 +785,17 @@
          * @returns {HTMLElement}
          */
         createRootElement: function () {
-            return doc[createElement](this.tagName);
-        },
-
-        /**
-         * Convenience method for performing querySelectorAll
-         * within the context of this Component.
-         * @param {String} selector
-         * @returns {HTMLElement[]}
-         */
-        findAll: function (selector) {
-            return this[elProp] ? qsa(this[elProp], selector) : [];
+            return doc.createElement(this.tagName);
         },
 
         /**
          * Convenience method for performing querySelector within
          * the context of this Component.
          * @param {String} selector
-         * @returns {HTMLElement|Null}
+         * @returns {Array}
          */
         find: function (selector) {
-            return this[elProp] ? this[elProp].querySelector(selector) : null;
+            return this.el ? slice.call(this.el.querySelectorAll(selector)) : [];
         },
 
         /**
@@ -566,7 +805,7 @@
          */
         findComponent: function (name) {
             return fromElement(
-                this.find('[' + dataComponentNameAttribute + '=' + name + ']')
+                this.find('[' + dataComponentNameAttribute + '=' + name + ']')[0]
             );
         },
 
@@ -576,9 +815,11 @@
          * @param name
          * @returns {Component[]}
          */
-        findAllComponents: function (name) {
-            return this.findAll('[' + dataComponentNameAttribute + '=' + name + ']')
-                       .map(fromElement);
+        findComponents: function (name) {
+            return map.call(
+                this.find('[' + dataComponentNameAttribute + '=' + name + ']'),
+                fromElement
+            );
         },
 
         invoke: invoke,
@@ -608,13 +849,14 @@
          * @returns {Component}
          */
         releaseGlobalHandler: function (event, fn) {
+
             var handlers = globalHandlers[event];
 
             if (!handlers) {
                 return this;
             }
 
-            globalHandlers[event] = handlers.filter(function (handler) {
+            globalHandlers[event] = filter.call(handlers, function (handler) {
                 return handler.fn !== fn;
             });
 
@@ -623,202 +865,21 @@
 
     };
 
-    /**
-     * Handles all events and invokes Component handlers
-     * based on their events object.
-     * @param {Event} event
-     * @param {Component[]} [chain] Only used internally when a chain of
-     *                              Components is already available.
-     */
-    var handleEvent = components.handleEvent = function (event, chain) {
-
-        var target = event.target;
-        var targetIsComponent = isComponent(target);
-        var targetComponentName = targetIsComponent ? target[nameProp] : null;
-        var type = event.type;
-        var component, events, delegateElement, key, selector, eventType, parts, method;
-
-        chain = slice.call(chain || parentComponents(
-            targetIsComponent ? target[elProp] : target, targetIsComponent
-        ));
-
-        while (chain.length) {
-
-            component = chain.shift();
-            events = component.events;
-
-            if (!events) {
-                continue;
-            }
-
-            for (key in events) {
-
-                parts = key.split(':');
-                selector = parts[lengthProp] > 1 ? parts[0] : null;
-                eventType = parts[lengthProp] > 1 ? parts[1] : parts[0];
-                method = events[key];
-
-                if (eventType === type || eventMappings[type] === eventType) {
-
-                    if (selector) {
-
-                        if (targetIsComponent) {
-
-                            if (selector === targetComponentName) {
-                                component[method](event);
-                            }
-
-                        }
-                        else {
-
-                            delegateElement = closestSelector(target, selector);
-
-                            if (delegateElement) {
-                                component[method](event, delegateElement);
-                            }
-
-                        }
-
-                    }
-                    else {
-                        component[method](event);
-                    }
-
-                }
-
-            }
-
-        }
-
-        // global handlers
-        var handlers = globalHandlers[event.type] || globalHandlers[eventMappings[event.type]];
-
-        if (!handlers) {
-            return;
-        }
-
-        for (var i = 0, l = handlers[lengthProp]; i < l; i++) {
-            handlers[i].fn[call](handlers[i].ctx, event, doc.body);
-        }
+    // public API
+    var components = {
+        Component: Component,
+        init: init,
+        bindEvents: bindEvents,
+        handleEvent: handleEvent,
+        parse: parse,
+        register: register,
+        fromElement: fromElement,
+        isComponent: isComponent,
+        getInstancesOf: getInstancesOf,
+        getInstanceOf: getInstanceOf,
+        destroy: destroy
     };
 
-    /**
-     * Parses the given element or the root element and creates Component instances.
-     * @param {HTMLElement} [el]
-     * @returns {Component[]}
-     */
-    var parse = components.parse = function (el) {
-        el = isElement(el) ? el : doc.body;
+    return components;
 
-        var els = qsa(el, '[' + dataComponentNameAttribute + ']');
-        els.unshift(el);
-
-        var result = [];
-        var i = 0;
-        var l = els[lengthProp];
-        var component;
-
-        for (; i < l; i++) {
-
-            component = fromElement(els[i]);
-
-            if (component) {
-                result.push(component);
-            }
-        }
-
-        return result;
-    };
-
-    /**
-     * Registers a new Component.
-     * @param {String|Object} name
-     * @param {Object} [impl] The implementation methods / properties.
-     * @returns {Function}
-     */
-    components.register = function (name, impl) {
-
-        if (toString[call](name) === toString[call]({})) {
-            impl = name;
-            name = impl[nameProp];
-        }
-
-        if (!isString(name) || !name) {
-            throw Error('"' + name + '" is not a valid component name');
-        }
-
-        if (componentClasses[name]) {
-            throw Error('A component called ' + name + ' already exists');
-        }
-
-        impl = impl || {};
-
-        var Constructor = function () {
-            Component.apply(this, arguments);
-        };
-
-        var Surrogate = function () {
-        };
-        Surrogate[prototype] = Component[prototype];
-        Constructor[prototype] = new Surrogate();
-        Constructor[prototype][nameProp] = name;
-
-        for (var key in impl) {
-            Constructor[prototype][key] = impl[key];
-        }
-
-        componentClasses[name] = Constructor;
-        return Constructor;
-    };
-
-    /**
-     * Binds all events to the body.
-     */
-    components.bindEvents = function () {
-
-        var key, el;
-
-        for (key in allEvents) {
-
-            // special case for resize and scroll event to listen on window
-            el = ['resize', 'scroll'].indexOf(key) !== -1 ? window : doc.body;
-
-            el.addEventListener(key, handleEvent, !!allEvents[key]);
-        }
-
-    };
-
-    /**
-     *
-     * @param {Object} options
-     * @param {Object} options.eventMappings
-     * @param {Object} options.additionalEvents
-     */
-    components.init = function (options) {
-
-        options = options || {};
-
-        if (options.eventMappings) {
-            eventMappings = options.eventMappings;
-        }
-
-        if (options.additionalEvents) {
-            for (var key in options.additionalEvents) {
-                allEvents[key] = options.additionalEvents[key];
-            }
-        }
-
-        components.parse();
-        components.bindEvents();
-    };
-
-    if (win.define && define.amd) {
-        define(function () {
-            return components;
-        });
-    }
-    else {
-        win.components = components;
-    }
-
-})();
+}));
