@@ -1,5 +1,7 @@
 # components.js
 
+[![Build Status:](https://secure.travis-ci.org/jonbretman/components.png?branch=master)](https://travis-ci.org/jonbretman/components)
+
 A simple way to manage web UI's. Inspired by Web Components, which sadly are not ready for production use yet without fairly heavy-weight frameworks like Polymer or Brick.
 
 The design goals are:
