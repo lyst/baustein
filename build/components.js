@@ -15,6 +15,7 @@
     var slice = [].slice;
     var filter = [].filter;
     var map = [].map;
+    var $ = win.jQuery || win.Zepto || win.$;
 
     /**
      * Map of component name -> component Class
@@ -173,6 +174,10 @@
      */
     function closestElement (el, selector) {
 
+        if ($) {
+            return $(el).closest(selector)[0];
+        }
+
         while (el && el !== doc.body) {
 
             if (matches(el, selector)) {
@@ -313,10 +318,6 @@
         var result = {};
         var name;
         var value;
-
-        if (!isElement(el)) {
-            return result;
-        }
 
         for (var i = 0; i < el.attributes.length; i++) {
 
@@ -592,6 +593,10 @@
 
         this.el = element;
 
+        if ($) {
+            this.$el = $(el);
+        }
+
         // options are built from optional default options - this can
         // be a property or a function that returns an object, the
         // data-component-option attributes, and finally any options
@@ -795,6 +800,11 @@
          * @returns {Array}
          */
         find: function (selector) {
+
+            if (this.$el) {
+                return this.$el.find(selector);
+            }
+
             return this.el ? slice.call(this.el.querySelectorAll(selector)) : [];
         },
 
@@ -866,7 +876,7 @@
     };
 
     // public API
-    var components = {
+    return {
         Component: Component,
         init: init,
         bindEvents: bindEvents,
@@ -879,7 +889,5 @@
         getInstanceOf: getInstanceOf,
         destroy: destroy
     };
-
-    return components;
 
 }));
