@@ -1,3 +1,4 @@
+"use strict";
 if (typeof window === 'undefined') {
     throw new Error('components requires an environment with a window');
 }
@@ -1025,7 +1026,7 @@ Component.prototype = {
 
 };
 
-export var components = {
+var components = {
     Component: Component,
     init: init,
     reset: reset,
@@ -1040,3 +1041,4 @@ export var components = {
     getInstanceOf: getInstanceOf,
     destroy: destroy
 };
+exports.components = components;

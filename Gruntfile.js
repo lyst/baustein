@@ -2,9 +2,9 @@ module.exports = function (grunt) {
 
     require('load-grunt-tasks')(grunt);
 
-    grunt.registerTask('default', ['test', 'build']);
+    grunt.registerTask('default', ['build']);
     grunt.registerTask('test', ['jshint', 'karma', 'output-coverage-summary']);
-    grunt.registerTask('build', ['jshint', 'uglify', 'copy']);
+    grunt.registerTask('build', ['jshint', 'transpile', 'uglify']);
 
     grunt.registerTask('output-coverage-summary', function () {
         grunt.log.writeln(grunt.file.read('coverage/text-summary.txt'));
@@ -13,27 +13,57 @@ module.exports = function (grunt) {
     grunt.initConfig({
 
         jshint: {
-            all: ['src/**/*.js', 'test/spec/**/*.js']
+            options: {
+                esnext: true,
+                undef: true,
+                unused: 'var',
+                browser: true
+            },
+            src: ['src/**/*.js']
         },
 
         clean: {
-            build: ['build'],
-            tests: ['test/src', 'test/reports']
-        },
-
-        copy: {
-            all: {
-                files: {
-                    'build/components.js': ['src/components.js']
-                }
-            }
+            dist: ['dist']
         },
 
         uglify: {
             all: {
                 files: {
-                    'build/components.min.js': ['src/components.js']
+                    'dist/components.amd.min.js': ['dist/components.amd.js'],
+                    'dist/components.cjs.min.js': ['dist/components.cjs.js'],
+                    'dist/components.globals.min.js': ['dist/components.globals.js']
                 }
+            }
+        },
+
+        transpile: {
+            cjs: {
+                type: "cjs",
+                files: [
+                    {
+                        src: 'src/components.js',
+                        dest: 'dist/components.cjs.js'
+                    }
+                ]
+            },
+            amd: {
+                anonymous: true,
+                type: "amd",
+                files: [
+                    {
+                        src: 'src/components.js',
+                        dest: 'dist/components.amd.js'
+                    }
+                ]
+            },
+            globals: {
+                type: "globals",
+                files: [
+                    {
+                        src: 'src/components.js',
+                        dest: 'dist/components.globals.js'
+                    }
+                ]
             }
         },
 
@@ -44,12 +74,12 @@ module.exports = function (grunt) {
                 frameworks: ['mocha', 'sinon', 'expect'],
                 options: {
                     files: [
-                        'src/components.js',
+                        'dist/components.globals.js',
                         'test/spec/components.js'
                     ],
                     reporters: ['mocha', 'coverage'],
                     preprocessors: {
-                        'src/**/*.js': ['coverage']
+                        'dist/**/*.js': ['coverage']
                     },
                     coverageReporter: {
                         reporters: [

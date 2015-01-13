@@ -1,14 +1,10 @@
-(function (root, factory) {
-
-    if (typeof define === 'function' && define.amd) {
-        // AMD. Register as an anonymous module.
-        define(factory);
-    } else {
-        // Browser globals
-        root.components = factory();
+define(
+  ["exports"],
+  function(__exports__) {
+    "use strict";
+    if (typeof window === 'undefined') {
+        throw new Error('components requires an environment with a window');
     }
-
-}(this, function () {
 
     var win = window;
     var doc = win.document;
@@ -16,8 +12,9 @@
     var filter = [].filter;
     var map = [].map;
 
-    // try and detect a DOM library eg. jQuery, Zepto etc...
-    var $ = win.jQuery || win.Zepto || win.$;
+    var domQuery = defaultDOMQuery;
+
+    var domWrapper = defaultDOMWrapper;
 
     /**
      * Map of component name -> component Class
@@ -137,6 +134,19 @@
     }
 
     /**
+     *
+     * @param el
+     * @param selector
+     */
+    function defaultDOMQuery(el, selector) {
+        return el ? el.querySelectorAll(selector) : [];
+    }
+
+    function defaultDOMWrapper(arr) {
+        return arr && arr.length ? slice.call(arr) : [];
+    }
+
+    /**
      * Mixes all arguments after `target` into `target` and returns `target`.
      * @param {Object} target
      * @returns {Object}
@@ -163,10 +173,6 @@
      * @returns {HTMLElement|Null}
      */
     function closestElement (el, selector) {
-
-        if ($) {
-            return $(el).closest(selector)[0];
-        }
 
         while (el && el !== doc.body) {
 
@@ -528,10 +534,10 @@
     }
 
     /**
-     * Binds all events to the body.
+     *
+     * @param {string} method
      */
-    function bindEvents() {
-
+    function eventManager(method) {
         var key, el;
 
         for (key in allEvents) {
@@ -539,16 +545,64 @@
             // special case for resize and scroll event to listen on window
             el = ['resize', 'scroll'].indexOf(key) !== -1 ? window : doc.body;
 
-            el.addEventListener(key, handleEvent, !!allEvents[key]);
+            el[method](key, handleEvent, !!allEvents[key]);
         }
-
     }
 
     /**
+     * Binds all events to the body.
      */
-    function init() {
+    function bindEvents() {
+        eventManager('addEventListener');
+    }
+
+    function unbindEvents() {
+        eventManager('removeEventListener');
+    }
+
+    /**
+     *
+     * @param {object} [options]
+     * @param {function} [options.domQuery]
+     * @param {function} [options.domWrapper]
+     */
+    function init(options) {
+
+        options = options || {};
+
+        if (options.domQuery) {
+            domQuery = options.domQuery;
+        }
+
+        if (options.domWrapper) {
+            domWrapper = options.domWrapper;
+        }
+
         parse();
         bindEvents();
+    }
+
+    /**
+     * Opposite of `init`. Destroys all component instances and un-registers all components.
+     * Resets the `domQuery` and `domWrapper` functions to their defaults.
+     */
+    function reset() {
+
+        // destroy any component instances
+        for (var key in componentInstances) {
+            if (componentInstances[key]) {
+                componentInstances[key].destroy();
+            }
+        }
+
+        // reset state
+        domQuery = defaultDOMQuery;
+        domWrapper = defaultDOMWrapper;
+        componentClasses = {};
+        componentInstances = {};
+
+        // unbind all event handlers
+        unbindEvents();
     }
 
     /**
@@ -561,7 +615,6 @@
 
     /**
      * @param {string} name
-     * @param {function} filter
      * @returns {Array}
      */
     function getInstancesOf(name) {
@@ -579,14 +632,14 @@
 
     /**
      * @param {string} name
-     * @returns {components|Component}
+     * @returns {object}
      */
     function destroy(name) {
         getInstancesOf(name).forEach(function(instance) {
             instance.destroy();
         });
 
-        return this;
+        return components;
     }
 
     /**
@@ -610,10 +663,6 @@
         componentInstances[this._id] = this;
 
         this.el = element;
-
-        if ($) {
-            this.$el = $(element);
-        }
 
         // options are built from optional default options - this can
         // be a property or a function that returns an object, the
@@ -840,12 +889,7 @@
          * @returns {Array}
          */
         find: function (selector) {
-
-            if (this.$el) {
-                return this.$el.find(selector);
-            }
-
-            return this.el ? slice.call(this.el.querySelectorAll(selector)) : [];
+            return domWrapper(domQuery(this.el, selector));
         },
 
         /**
@@ -981,28 +1025,14 @@
             });
 
             return this;
-        },
-
-        /**
-         * Scroll the window to the component.
-         */
-        scrollTo: function () {
-
-            if (this.$el) {
-                window.scrollTo(0, this.$el.position().top);
-            }
-            else {
-                window.scrollTo(0, this.el.getBoundingClientRect().top + window.scrollY);
-            }
-
         }
 
     };
 
-    // public API
-    return {
+    var components = {
         Component: Component,
         init: init,
+        reset: reset,
         bindEvents: bindEvents,
         handleEvent: handleEvent,
         parse: parse,
@@ -1014,5 +1044,5 @@
         getInstanceOf: getInstanceOf,
         destroy: destroy
     };
-
-}));
+    __exports__.components = components;
+  });

@@ -26,31 +26,28 @@ describe('components', function () {
 
     var Component = components.Component;
     var testRoot = document.createElement('div');
-    var componentNames = [];
+
     testRoot.id = 'test-root';
     document.body.appendChild(testRoot);
 
+    beforeEach(function () {
+        components.init();
+    });
+
     afterEach(function () {
+        components.reset();
         testRoot.innerHTML = '';
-        componentNames.forEach(components.unregister);
-        componentNames = [];
     });
 
     var addTestHTML = function () {
         testRoot.innerHTML = [].slice.call(arguments).join('');
     };
 
-    var createComponentName = (function () {
-
-        var n = 0;
-
+    var createComponentName = (function (n) {
         return function () {
-            var name = 'component-' + n++;
-            componentNames.push(name);
-            return name;
+            return 'component-' + n++;
         };
-
-    })();
+    })(0);
 
     var makeEvent = function (event, target) {
         return {
