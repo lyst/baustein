@@ -9,8 +9,16 @@ var slice = [].slice;
 var filter = [].filter;
 var map = [].map;
 
+/**
+ * The current function to use to query elements in the DOM. Can be overridden when calling `init`.
+ * @type {function}
+ */
 var domQuery = defaultDOMQuery;
 
+/**
+ * The current function to use as a DOM wrapper. Can be overridden when calling `init`.
+ * @type {function}
+ */
 var domWrapper = defaultDOMWrapper;
 
 /**
@@ -131,14 +139,19 @@ function toCamelCase (str) {
 }
 
 /**
- *
- * @param el
- * @param selector
+ * The default function to perform DOM queries.
+ * @param {HTMLElement} el
+ * @param {string} selector
  */
 function defaultDOMQuery(el, selector) {
     return el ? el.querySelectorAll(selector) : [];
 }
 
+/**
+ * The default function to wrap the results of DOM queries.
+ * @param {array|NodeList} arr
+ * @returns {Array}
+ */
 function defaultDOMWrapper(arr) {
     return arr && arr.length ? slice.call(arr) : [];
 }
@@ -547,21 +560,25 @@ function eventManager(method) {
 }
 
 /**
- * Binds all events to the body.
+ * Binds all events.
  */
 function bindEvents() {
     eventManager('addEventListener');
 }
 
+/**
+ * Unbinds all events.
+ */
 function unbindEvents() {
     eventManager('removeEventListener');
 }
 
 /**
- *
+ * Initialises the components library by parsing the DOM and binding events.
  * @param {object} [options]
- * @param {function} [options.domQuery]
- * @param {function} [options.domWrapper]
+ * @param {function} [options.domQuery] A custom function to use to make DOM queries.
+ * @param {function} [options.domWrapper] A custom function to use to wrap the results
+ *                                        of DOM queries.
  */
 function init(options) {
 
