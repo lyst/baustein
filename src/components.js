@@ -15,6 +15,8 @@
     var slice = [].slice;
     var filter = [].filter;
     var map = [].map;
+
+    // try and detect a DOM library eg. jQuery, Zepto etc...
     var $ = win.jQuery || win.Zepto || win.$;
 
     /**
@@ -36,27 +38,12 @@
     var globalHandlers = {};
 
     /**
-     * Map of real event name -> mapped event name.
-     *
-     * For example to listen for both 'mousemove' and
-     * 'touchmove' events as 'pointermove' you can do:
-     *     {
-     *         mousemove: 'pointermove',
-     *         touchmove: 'pointermove'
-     *     }
-     * @type {Object}
-     */
-    var eventMappings = {};
-
-    /**
      * Incrementing number used to give each component a unique id.
      * @type {Number}
      */
     var nextComponentId = 1;
 
-    var dataPrefix = 'data-component-';
-    var dataComponentNameAttribute = dataPrefix + 'name';
-    var dataComponentIdAttribute = dataPrefix + 'id';
+    var dataComponentIdAttribute = 'data-component-id';
 
     /**
      * Map of event name -> flag indicating whether or not to use useCapture
@@ -68,6 +55,8 @@
         mousedown: false,
         mouseup: false,
         mousemove: false,
+        mouseleave: true,
+        mouseenter: true,
         touchstart: false,
         touchmove: false,
         touchend: false,
@@ -79,7 +68,8 @@
         scroll: true,
         submit: true,
         change: true,
-        resize: true
+        resize: true,
+        load: true
     };
 
     /**
@@ -213,23 +203,23 @@
     /**
      * Returns the nearest Component instance for the passed element.
      * @param {HTMLElement} element
-     * @param {Boolean} [ignoreRoot] If true
      * @returns {Component[]}
      */
-    function parentComponents(element, ignoreRoot) {
+    function parentComponents(element) {
 
         var id;
         var result = [];
 
-        if (ignoreRoot) {
-            element = element.parentElement;
+        // Quick return for window or document
+        if (element === win || element === doc) {
+            return [];
         }
 
-        while (element && element !== doc.body) {
+        while (isElement(element)) {
 
             id = element.getAttribute(dataComponentIdAttribute);
 
-            if (id) {
+            if (id && componentInstances[id]) {
                 result.push(componentInstances[id]);
             }
 
@@ -243,7 +233,7 @@
      * Returns the Component instance for the passed element or null.
      * If a component instance has already been created for this element
      * then it is returned, if not a new instance of the correct Component is created.
-     * @param {HTMLElement|jQuery} el
+     * @param {HTMLElement} el
      */
     function fromElement(el) {
 
@@ -254,7 +244,7 @@
             return null;
         }
 
-        name = el.getAttribute(dataComponentNameAttribute);
+        name = el.getAttribute('is');
         id = el.getAttribute(dataComponentIdAttribute);
 
         // if no name then it is not a component
@@ -305,15 +295,14 @@
     }
 
     /**
-     * Given an element returns an object containing all data-* attributes
-     * except for data-component-name and data-component-id.
+     * Given an element returns an object containing all the attributes parsed as JSON.
      *
      * Runs all values through JSON.parse() so it is possible to pass
      * structured data to component instances through data-* attributes.
      * @param {HTMLElement} el
      * @returns {Object}
      */
-    function parseDataAttributes(el) {
+    function parseAttributes(el) {
 
         var result = {};
         var name;
@@ -322,21 +311,15 @@
         for (var i = 0; i < el.attributes.length; i++) {
 
             name = toCamelCase(el.attributes[i].name);
+            value = el.attributes[i].value;
 
-            if (name.substring(0, 19) === 'dataComponentOption') {
-
-                name = name[19].toLowerCase() + name.substring(20);
-                value = el.attributes[i].value;
-
-                try {
-                    value = JSON.parse(value);
-                }
-                catch (e) {
-                }
-
-                result[name] = value;
-
+            try {
+                value = JSON.parse(value);
             }
+            catch (e) {
+            }
+
+            result[name] = value;
 
         }
 
@@ -353,48 +336,74 @@
     }
 
     /**
-     * Handles all events and invokes Component handlers
-     * based on their events object.
+     * Handles all events - both standard DOM events and custom Component events.
+     *
+     * Finds all component instances that contain the 'target' and if they have an event
+     * handler for this event it is called. Components closer to the target are called first.
+     *
+     * If the event is a DOM event then the event target is the 'target' property of the event.
+     * If the event is a custom Component event then the target is the component that emitted the event.
+     *
      * @param {Event} event
      * @param {Component[]} [componentsChain] Only used internally when a chain of
      *                                        Components is already available.
      */
     function handleEvent(event, componentsChain) {
 
+        // this will be a DOM element or a Component
+        // component event objects are created in Component.prototype.emit
         var target = event.target;
+
+        // we need to know if the target is a DOM element or a component instance
         var targetIsComponent = isComponent(target);
+
+        // if it is a component instance we need the name
         var targetComponentName = targetIsComponent ? target.name : null;
-        var type = event.type;
-        var component, events, closest, key, selector, eventType, parts, method, handlers, i, length;
 
-        componentsChain = componentsChain ? slice.call(componentsChain) : parentComponents(
-            targetIsComponent ? target.el : target, targetIsComponent
-        );
+        // this will be the name of the event
+        var eventName = event.type;
 
-        while (componentsChain.length) {
+        var component, events, closest, selector;
+        var eventType, method, handlers, i, j, length, eventsLength;
 
-            component = componentsChain.shift();
-            events = component.events;
+        // We now need to make sure we have the chain of components above the target,
+        // There are three cases here:
+        // 1. We already have a component chain (internal use)
+        // 2. The target is a component, in which case we get the element from the 'el' property
+        // 3. The target is a DOM element
+        // The second argument passed to parentComponents tells it whether or not to include
+        // in the returned array the Component instance attached to the root element. If this is
+        // a component triggered event we do not want to try and find a handler on the same instance.
+        if (!componentsChain) {
+            componentsChain = parentComponents(
+                targetIsComponent ? target.el : target
+            );
+        }
 
+        for (i = 0, length = componentsChain.length; i < length; i++) {
+
+            component = componentsChain[i];
+            events = component._events;
+
+            // if component has no events continue to next component
             if (!events) {
                 continue;
             }
 
-            for (key in events) {
+            for (j = 0, eventsLength = events.length; j < eventsLength; j++) {
 
-                parts = key.split(':');
-                selector = parts.length > 1 ? parts[0] : null;
-                eventType = parts.length > 1 ? parts[1] : parts[0];
-                method = events[key];
+                eventType = events[j][0];
+                selector = events[j][1];
+                method = events[j][2];
 
                 // if event doesn't match then go to next component
-                if (eventType !== type && eventMappings[type] !== eventType) {
+                if (eventType !== eventName) {
                     continue;
                 }
 
                 // if there is no selector just invoke the handler and move on
                 if (!selector) {
-                    component[method](event);
+                    method.call(component, event);
                     continue;
                 }
 
@@ -402,17 +411,20 @@
                 // selector just needs to match the component name
                 if (targetIsComponent) {
 
+                    // if component name matches call the handler
                     if (selector === targetComponentName) {
-                        component[method](event);
+                        method.call(component, event);
                     }
 
                 }
                 else {
 
+                    // see if the selector matches the event target
                     closest = closestElement(target, selector);
 
+                    // if it does then call the handler passing the matched element
                     if (closest) {
-                        component[method](event, closest);
+                        method.call(component, event, closest);
                     }
 
                 }
@@ -421,13 +433,17 @@
 
         }
 
-        // global handlers
-        handlers = globalHandlers[event.type] || globalHandlers[eventMappings[event.type]];
+        // Now all component events have been handled we need to handler 'global'
+        // events that have been subscribed to using 'setGlobalHandler'.
+        // This is supported for components that need to listen to events on the body/document/window.
+        handlers = globalHandlers[eventName];
 
+        // if there are no handlers we are done
         if (!handlers) {
             return;
         }
 
+        // call the global handlers
         for (i = 0, length = handlers.length; i < length; i++) {
             handlers[i].fn.call(handlers[i].ctx, event, doc.body);
         }
@@ -435,15 +451,15 @@
 
     /**
      * Parses the given element or the root element and creates Component instances.
-     * @param {HTMLElement|jQuery} [root]
+     * @param {HTMLElement} [root]
      * @returns {Component[]}
      */
     function parse(root) {
 
-        // allow jQuery, DOM element, or nothing
+        // allow DOM element or nothing
         root = isElement(root) ? root : doc.body;
 
-        var els = slice.call(root.querySelectorAll('[' + dataComponentNameAttribute + ']'));
+        var els = slice.call(root.querySelectorAll('[is]'));
         var component;
 
         // add the root element to the front
@@ -503,6 +519,15 @@
     }
 
     /**
+     * Un-registers a Component class and destroys any existing instances.
+     * @param {string} name
+     */
+    function unregister(name) {
+        destroy(name);
+        componentClasses[name] = null;
+    }
+
+    /**
      * Binds all events to the body.
      */
     function bindEvents() {
@@ -520,20 +545,8 @@
     }
 
     /**
-     * @param {Object} options
-     * @param {Object} options.eventMappings
-     * @param {Object} options.additionalEvents
      */
-    function init(options) {
-
-        options = options || {};
-
-        if (options.eventMappings) {
-            eventMappings = options.eventMappings;
-        }
-
-        extend(allEvents, options.additionalEvents);
-
+    function init() {
         parse();
         bindEvents();
     }
@@ -584,7 +597,12 @@
      */
     function Component (element, options) {
 
-        if (!element) {
+        if (arguments.length === 1 && isObject(element)) {
+           options = element;
+           element = this.createRootElement();
+        }
+
+        if (!arguments.length) {
             element = this.createRootElement();
         }
 
@@ -594,24 +612,32 @@
         this.el = element;
 
         if ($) {
-            this.$el = $(el);
+            this.$el = $(element);
         }
 
         // options are built from optional default options - this can
         // be a property or a function that returns an object, the
-        // data-component-option attributes, and finally any options
-        // passed to the constructor
+        // element attributes, and finally any options passed to the constructor
         this.options = extend(
             {},
             isFunction(this.defaultOptions) ? this.defaultOptions() : this.defaultOptions,
-            parseDataAttributes(this.el),
+            parseAttributes(this.el),
             options
         );
 
-        element.setAttribute(dataComponentNameAttribute, this.name);
+        if (this.options.template) {
+            this.template = this.options.template;
+        }
+
+        element.setAttribute('is', this.name);
         element.setAttribute(dataComponentIdAttribute, this._id);
 
+        this._events = [];
+
         this.init();
+
+        this.setupEvents(this.registerEvent.bind(this));
+
         this.render();
     }
 
@@ -637,13 +663,27 @@
         },
 
         /**
+         * Sets up any events required on the component, called during component initialisation.
+         * @example
+         *  setupEvents: function(add) {
+         *      add('click', '.image-thumbnail', this._onImageThumbnailClick);
+         *      add('mouseover', '.image', this._onImageMouseOverClick);
+         *  }
+         * @param {Function} add - use this function to add any events to the component
+         */
+        setupEvents: noop,
+
+        /**
          * Renders the contents of the component into the root element.
          * @returns {Component}
          */
         render: function () {
+            var template = this.template;
+            var templateIsFunction = isFunction(template);
+            var templateIsString = isString(template);
 
-            if (isFunction(this.template)) {
-                this.el.innerHTML = this.template(this);
+            if (templateIsFunction || templateIsString) {
+                this.el.innerHTML = templateIsFunction ? template(this) : template;
                 this.parse();
             }
 
@@ -668,7 +708,7 @@
         emit: function (name, data, chain) {
 
             data = data || {};
-            data.target = this;
+            data.target = data.target || this;
             data.type = name;
             data.customEvent = true;
 
@@ -677,7 +717,7 @@
 
         /**
          * Appends this Component to an element.
-         * @param {HTMLElement|jQuery} el
+         * @param {HTMLElement} el
          * @returns {Component}
          */
         appendTo: function (el) {
@@ -815,7 +855,7 @@
          */
         findComponent: function (name) {
             return fromElement(
-                this.find('[' + dataComponentNameAttribute + '=' + name + ']')[0]
+                this.find('[is=' + name + ']')[0]
             );
         },
 
@@ -827,12 +867,80 @@
          */
         findComponents: function (name) {
             return map.call(
-                this.find('[' + dataComponentNameAttribute + '=' + name + ']'),
+                this.find('[is=' + name + ']'),
                 fromElement
             );
         },
 
         invoke: invoke,
+
+        /**
+         * Registers an event that this component would like to listen to.
+         * @param {string} event
+         * @param {string|function} selector
+         * @param {function} [handler]
+         * @returns {Component}
+         */
+        registerEvent: function (event, selector, handler) {
+
+            if (arguments.length === 2) {
+                handler = selector;
+                selector = null;
+            }
+
+            this._events.push([event, selector, handler]);
+            return this;
+        },
+
+        /**
+         * Release an event or all events off an object.
+         * @example
+         *  releaseEvent('click', '.image-thumbnail, this._onImageThumbnailClick);
+         *  // releases the specific click event handler on an object
+         *
+         * @example
+         *  releaseEvent('click', '.image-thumbnail');
+         *  // release all click events on the object
+         *
+         * @example
+         *  releaseEvent('click'); // releases all click events on the component
+         *
+         * @param {String} event - the event to release
+         * @param {String} [selector] - the selector of the object to release the event
+         * @param {Function} [handler] - the handler to release off the object
+         */
+        releaseEvent: function(event, selector, handler) {
+
+            if (isFunction(selector) && !handler) {
+                handler = selector;
+                selector = null;
+            }
+
+            if (!isFunction(handler)) {
+                handler = null;
+            }
+
+            if (typeof(selector) === 'undefined') {
+                selector = null;
+            }
+
+            this._events = filter.call(this._events, function(ev) {
+                var eventName = ev[0];
+                var eventSelector = ev[1];
+                var eventHandler = ev[2];
+
+                if (!handler) {
+                    // we don't care what handler, just get rid of it
+                    return !(eventName === event && eventSelector === selector);
+                }
+                else {
+                    return !(eventName === event && eventSelector === selector &&
+                        eventHandler === handler);
+                }
+
+            });
+
+        },
 
         /**
          * Set a global event handler. This is useful when you
@@ -861,16 +969,32 @@
         releaseGlobalHandler: function (event, fn) {
 
             var handlers = globalHandlers[event];
+            var ctx = this;
 
             if (!handlers) {
                 return this;
             }
 
+            // filter out entries with the same function and context
             globalHandlers[event] = filter.call(handlers, function (handler) {
-                return handler.fn !== fn;
+                return handler.fn !== fn || handler.ctx !== ctx;
             });
 
             return this;
+        },
+
+        /**
+         * Scroll the window to the component.
+         */
+        scrollTo: function () {
+
+            if (this.$el) {
+                window.scrollTo(0, this.$el.position().top);
+            }
+            else {
+                window.scrollTo(0, this.el.getBoundingClientRect().top + window.scrollY);
+            }
+
         }
 
     };
@@ -883,6 +1007,7 @@
         handleEvent: handleEvent,
         parse: parse,
         register: register,
+        unregister: unregister,
         fromElement: fromElement,
         isComponent: isComponent,
         getInstancesOf: getInstancesOf,

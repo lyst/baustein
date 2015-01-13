@@ -1,25 +1,56 @@
+// PhantomJS sigh...
+if (!Function.prototype.bind) {
+    Function.prototype.bind = function (oThis) {
+        if (typeof this !== 'function') {
+            // closest thing possible to the ECMAScript 5
+            // internal IsCallable function
+            throw new TypeError('Function.prototype.bind - what is trying to be bound is not callable');
+        }
+
+        var aArgs = Array.prototype.slice.call(arguments, 1),
+            fToBind = this,
+            fNOP = function () {
+            },
+            fBound = function () {
+                return fToBind.apply(this instanceof fNOP && oThis ? this: oThis, aArgs.concat(Array.prototype.slice.call(arguments)));
+            };
+
+        fNOP.prototype = this.prototype;
+        fBound.prototype = new fNOP();
+
+        return fBound;
+    };
+}
+
 describe('components', function () {
 
     var Component = components.Component;
     var testRoot = document.createElement('div');
+    var componentNames = [];
     testRoot.id = 'test-root';
     document.body.appendChild(testRoot);
 
     afterEach(function () {
         testRoot.innerHTML = '';
+        componentNames.forEach(components.unregister);
+        componentNames = [];
     });
 
     var addTestHTML = function () {
         testRoot.innerHTML = [].slice.call(arguments).join('');
     };
 
-    var rand = function () {
-        return Math.floor(Math.random() * 100);
-    };
+    var createComponentName = (function () {
 
-    var createComponentName = function () {
-        return ['component', rand(), rand(), rand()].join('-');
-    };
+        var n = 0;
+
+        return function () {
+            var name = 'component-' + n++;
+            componentNames.push(name);
+            return name;
+        };
+
+    })();
 
     var makeEvent = function (event, target) {
         return {
@@ -27,10 +58,6 @@ describe('components', function () {
             type: event
         };
     };
-
-    it('should exist', function () {
-        expect(components.Component).to.be.ok();
-    });
 
     describe('components.Component', function () {
 
@@ -41,6 +68,14 @@ describe('components', function () {
         it('should create a root element if one is not passed', function () {
             var component = new Component();
             expect(component.el).to.have.property('tagName', 'DIV');
+        });
+
+        it('should create a root element if only a options object is passed', function () {
+            var component = new Component({
+                foo: 'bar'
+            });
+            expect(component.el).to.have.property('tagName', 'DIV');
+            expect(component.options).to.have.property('foo', 'bar');
         });
 
         it('should accept a root element if one is passed', function () {
@@ -65,7 +100,7 @@ describe('components', function () {
         it('should set the name as an attribute on the root element', function () {
             var el = document.createElement('div');
             var component = new Component(el);
-            expect(el.getAttribute('data-component-name')).to.eql(component.name);
+            expect(el.getAttribute('is')).to.eql(component.name);
         });
 
         it('should save passed options', function () {
@@ -75,17 +110,17 @@ describe('components', function () {
                 two: 2,
                 three: [1, 2, 3]
             };
-            var c = new Component(null, options);
+            var c = new Component(options);
             expect(c.options).to.eql(options);
 
         });
 
-        it('should parse data attributes from the root element to get options', function () {
+        it('should parse attributes from the root element to get options', function () {
 
             var el = document.createElement('div');
-            el.setAttribute('data-component-option-foo', 'foo');
-            el.setAttribute('data-component-option-bar', JSON.stringify({key: 'value'}));
-            el.setAttribute('data-component-option-baz-bob', 5);
+            el.setAttribute('foo', 'foo');
+            el.setAttribute('bar', JSON.stringify({key: 'value'}));
+            el.setAttribute('baz-bob', 5);
 
             expect(new Component(el).options).to.eql({
                 foo: 'foo',
@@ -97,7 +132,7 @@ describe('components', function () {
 
         });
 
-        it('should use defaultOptions first, then data attributes, then passed options', function () {
+        it('should use defaultOptions first, then attributes, then passed options', function () {
 
             var name = createComponentName();
             var C = components.register(name, {
@@ -108,13 +143,38 @@ describe('components', function () {
             expect(new C().options.foo).to.equal('default value');
 
             var d = document.createElement('div');
-            d.setAttribute('data-component-option-foo', 'attribute value');
+            d.setAttribute('foo', 'attribute value');
 
             expect(new C(d).options.foo).to.equal('attribute value');
 
-            expect(new C(null, {
+            expect(new C({
                 foo: 'passed value'
             }).options.foo).to.equal('passed value');
+        });
+
+        it('should call setupEvents passing it a bound version of registerEvent', function () {
+
+            var handler = sinon.spy();
+
+            var setupEvents = sinon.spy(function (add) {
+                add('click', '.some-selector', handler);
+            });
+
+            var registerEvent = sinon.spy();
+
+            var Component1 = components.register(createComponentName(), {
+                setupEvents: setupEvents,
+                registerEvent: registerEvent
+            });
+
+            var c = new Component1();
+
+            expect(setupEvents.callCount).to.equal(1);
+
+            var call = registerEvent.getCall(0);
+            expect(call.calledOn(c)).to.equal(true);
+            expect(call.args).to.eql(['click', '.some-selector', handler]);
+
         });
 
         describe('#defaultOptions()', function () {
@@ -156,7 +216,7 @@ describe('components', function () {
 
             beforeEach(function () {
                 name = createComponentName();
-                addTestHTML('<div id="el" data-component-name="' + name + '"></div>');
+                addTestHTML('<div id="el" is="' + name + '"></div>');
                 components.register(name);
                 components.parse();
                 c = components.fromElement(document.getElementById('el'));
@@ -208,11 +268,10 @@ describe('components', function () {
 
                 var C = components.register(createComponentName());
 
-                var events = {};
-                events[C.prototype.name + ':remove'] = 'removeEventHandler';
-
                 var def = {
-                    events: events,
+                    setupEvents: function (add) {
+                        add('remove', C.prototype.name, this.removeEventHandler);
+                    },
                     removeEventHandler: sinon.spy()
                 };
 
@@ -251,7 +310,7 @@ describe('components', function () {
 
             it('should remove the element, destroy the component instance, and return null', function () {
                 var name = createComponentName();
-                addTestHTML('<div id="test-el" data-component-name="' + name + '"></div>');
+                addTestHTML('<div id="test-el" is="' + name + '"></div>');
                 components.register(name);
                 components.parse();
                 var c = components.fromElement(document.getElementById('test-el'));
@@ -282,11 +341,10 @@ describe('components', function () {
 
                 var C = components.register(createComponentName());
 
-                var events = {};
-                events[C.prototype.name + ':destroy'] = 'destroyEventHandler';
-
                 var def = {
-                    events: events,
+                    setupEvents: function (add) {
+                        add('destroy', C.prototype.name, this.destroyEventHandler);
+                    },
                     destroyEventHandler: sinon.spy()
                 };
 
@@ -338,10 +396,27 @@ describe('components', function () {
                         }
                     });
 
-                    var actual = new C(null, {text: 'Hello world'}).el.innerHTML;
+                    var actual = new C({text: 'Hello world'}).el.innerHTML;
                     var expected = '<span>Hello world</span>';
 
                     expect(actual).to.equal(expected);
+                });
+
+            });
+
+            describe('when the template property is a string', function () {
+
+                it('it should add it to el', function () {
+
+                    var content = '<span>Hello world</span>';
+
+                    var C = components.register(createComponentName(), {
+                        template: content
+                    });
+
+                    var actual = new C().el.innerHTML;
+
+                    expect(actual).to.equal(content);
                 });
 
             });
@@ -530,6 +605,84 @@ describe('components', function () {
 
         });
 
+        describe('#emit(name, data, chain)', function () {
+
+            it('should call handler when emit event on same component', function () {
+                var spy = sinon.spy();
+                var Component = components.register(createComponentName(), {
+                    setupEvents: function (add) {
+                        add('foo', spy);
+                    }
+                });
+
+                var component = new Component();
+                component.emit('foo');
+                expect(spy.callCount).to.equal(1);
+
+            });
+
+            it('should call handler on parent component when emit on child', function () {
+                var spy = sinon.spy();
+                var ComponentParent = components.register(createComponentName(), {
+                    setupEvents: function (add) {
+                        add('foo', spy);
+                    }
+                });
+
+                var ComponentChild = components.register(createComponentName());
+
+                var componentParent = new ComponentParent();
+                var componentChild = new ComponentChild();
+
+                componentChild.appendTo(componentParent.el);
+
+                componentChild.emit('foo');
+                expect(spy.callCount).to.equal(1);
+
+            });
+
+            it('should call handler with data', function () {
+                var spy = sinon.spy();
+                var data = {
+                    foo: 'bar'
+                };
+
+                var Component = components.register(createComponentName(), {
+                    setupEvents: function (add) {
+                        add('foo', spy);
+                    }
+                });
+
+                var component = new Component();
+                component.emit('foo', data);
+                expect(spy.calledWith(data));
+
+            });
+
+            it('should call handler with custom target', function () {
+
+                var spy = sinon.spy();
+                var el = document.createElement('div');
+                var Component = components.register(createComponentName(), {
+                    setupEvents: function (add) {
+                        add('foo', spy);
+                    }
+                });
+
+                var component = new Component();
+
+                component.el.appendChild(el);
+
+                component.emit('foo', {
+                    target: el
+                });
+
+                expect(spy.getCall(0).args[0].target).to.be(el);
+
+            });
+
+        });
+
         describe('#getInstanceOf(name)', function () {
 
             it('should return a instance or undefined', function () {
@@ -598,6 +751,150 @@ describe('components', function () {
 
         });
 
+        describe('#registerEvent(event, selector, handler)', function () {
+
+            it('should add an entry to the _events array', function () {
+
+                var Component1 = components.register(createComponentName());
+
+                var c = new Component1();
+
+                expect(c._events).to.have.length(0);
+
+                var handler = function () {
+                };
+                c.registerEvent('click', handler);
+                c.registerEvent('click', '.some-selector', handler);
+
+                expect(c._events).to.have.length(2);
+
+                expect(c._events[0]).to.eql(['click', null, handler]);
+                expect(c._events[1]).to.eql(['click', '.some-selector', handler]);
+
+            });
+
+        });
+
+        describe('#releaseEvent(event, selector, handler)', function () {
+
+            it('given an event, selector and handler, remove the specific handler', function () {
+                var NewComponent = components.register(createComponentName());
+                var c = new NewComponent();
+
+                var handler = function () {
+                };
+                var handler2 = function () {
+                    return false;
+                };
+                c.registerEvent('click', '.dom', handler);
+                c.registerEvent('click', '.dom', handler2);
+                c.registerEvent('click', handler);
+
+                expect(c._events).to.have.length(3);
+                c.releaseEvent('click', '.dom', handler);
+                expect(c._events).to.have.length(2);
+            });
+
+            it('given an event, selector, remove all events for that selector', function () {
+                var NewComponent = components.register(createComponentName());
+                var c = new NewComponent();
+
+                var handler = function () {
+                };
+                var handler2 = function () {
+                    return true;
+                };
+                c.registerEvent('click', '.dom', handler);
+                c.registerEvent('click', '.dom', handler2);
+                c.registerEvent('click', handler);
+
+                c.releaseEvent('click', '.dom');
+                expect(c._events).to.have.length(1);
+            });
+
+            it('given an event, remove all events from the component only', function () {
+                var NewComponent = components.register(createComponentName());
+                var c = new NewComponent();
+
+                var handler = function () {
+                };
+                var handler2 = function () {
+                    return true;
+                };
+                c.registerEvent('click', '.dom', handler);
+                c.registerEvent('click', '.dom', handler2);
+                c.registerEvent('click', handler);
+
+                c.releaseEvent('click');
+                expect(c._events).to.have.length(2);
+
+                c.registerEvent('click', handler);
+                c.registerEvent('click', handler2);
+                c.releaseEvent('click');
+                expect(c._events).to.have.length(2);
+            });
+
+            it('should not remove unspecified events', function () {
+                var NewComponent = components.register(createComponentName());
+                var c = new NewComponent();
+
+                var handler = function () {
+                };
+                var handler2 = function () {
+                    return true;
+                };
+
+                c.registerEvent('click', '.dom', handler);
+                c.registerEvent('click', '.dom', handler2);
+                c.registerEvent('hover', handler);
+
+                c.releaseEvent('hover', handler2);
+                expect(c._events).to.have.length(3);
+
+                c.releaseEvent('click');
+                expect(c._events).to.have.length(3);
+
+                c.releaseEvent('mouseout', '.dom', handler);
+                expect(c._events).to.have.length(3);
+
+                c.releaseEvent('mouseout', '.dom');
+                expect(c._events).to.have.length(3);
+            });
+        });
+
+        describe('#releaseGlobalHandler', function () {
+
+            it('should call handlers registered with setGlobalHandler', function () {
+
+                var handler = sinon.spy();
+                var Component = components.register(createComponentName());
+                var component1 = new Component();
+                var component2 = new Component();
+
+                // both using the same handler
+                component1.setGlobalHandler('foo', handler);
+                component2.setGlobalHandler('foo', handler);
+
+                // handler should be called twice
+                components.handleEvent({
+                    type: 'foo',
+                    target: document.body
+                });
+                expect(handler.callCount).to.equal(2);
+
+                // one component releases the handler
+                component1.releaseGlobalHandler('foo', handler);
+
+                // one handler should still remain
+                components.handleEvent({
+                    type: 'foo',
+                    target: document.body
+                });
+                expect(handler.callCount).to.equal(3);
+            });
+
+        });
+
     });
 
     describe('components.register(name, implementation)', function () {
@@ -662,10 +959,10 @@ describe('components', function () {
             var name3 = createComponentName();
 
             addTestHTML(
-                    '<div id="first" data-component-name="' + name1 + '"></div>',
-                    '<div id="second" data-component-name="' + name2 + '"><span class="outer"><span id="span-inner" class="inner"></span></span></div>',
-                    '<div id="third" data-component-name="' + name1 + '"></div>',
-                    '<div id="fourth" data-component-name="' + name3 + '"></div>',
+                    '<div id="first" is="' + name1 + '"></div>',
+                    '<div id="second" is="' + name2 + '"><span class="outer"><span id="span-inner" class="inner"></span></span></div>',
+                    '<div id="third" is="' + name1 + '"></div>',
+                    '<div id="fourth" is="' + name3 + '"></div>',
                 '<div id="fifth"></div>'
             );
 
@@ -673,14 +970,14 @@ describe('components', function () {
             var event = makeEvent('click', document.getElementById('first'));
 
             components.register(name1, {
-                events: {
-                    'click': 'onClick'
+                setupEvents: function (add) {
+                    add('click', this.onClick);
                 },
                 onClick: spy
             });
             components.register(name2, {
-                events: {
-                    '.outer:click': 'onOuterClick'
+                setupEvents: function (add) {
+                    add('click', '.outer', this.onOuterClick);
                 },
                 onOuterClick: spy
             });
@@ -717,8 +1014,8 @@ describe('components', function () {
             var name = createComponentName();
 
             addTestHTML(
-                    '<div data-component-name="' + name + '">',
-                '  <span class="one two"><span><span data-some-attribute><span id="target"></span></span></span></span>',
+                    '<div is="' + name + '">',
+                '  <span class="one two"><span><span some-attribute><span id="target"></span></span></span></span>',
                 '</div>'
             );
 
@@ -726,8 +1023,8 @@ describe('components', function () {
             var event = makeEvent('click', document.getElementById('target'));
 
             components.register(name, {
-                events: {
-                    '.one.two [data-some-attribute]:click': 'onClick'
+                setupEvents: function (add) {
+                    add('click', '.one.two [some-attribute]', this.onClick);
                 },
                 onClick: spy
             });
@@ -736,6 +1033,27 @@ describe('components', function () {
             components.handleEvent(event);
 
             expect(spy.callCount).to.equal(1);
+        });
+
+        it('should call handlers registered with setGlobalHandler', function () {
+
+            var name = createComponentName();
+            var handler = sinon.spy();
+
+            var C = components.register(name);
+
+            var el = document.createElement('div');
+            var c = new C();
+            c.el.appendChild(el);
+
+            c.setGlobalHandler('click', handler);
+
+            components.handleEvent({
+                type: 'click',
+                target: document.body
+            });
+
+            expect(handler.callCount).to.equal(1);
         });
 
     });
@@ -747,7 +1065,7 @@ describe('components', function () {
         beforeEach(function () {
             name = createComponentName();
             el = document.createElement('div');
-            el.setAttribute('data-component-name', name);
+            el.setAttribute('is', name);
         });
 
         it('should create the correct component if it doesnt exist', function () {
