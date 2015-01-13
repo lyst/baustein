@@ -656,11 +656,14 @@ function Component (element, options) {
     }
 
     this._id = nextComponentId++;
-    componentInstances[this._id] = this;
-
+    this._events = [];
     this.el = element;
 
-    // options are built from optional default options - this can
+    // Convenience for accessing this components root element wrapped
+    // in whatever `domWrapper` returns. Not used internally.
+    this.$el = domWrapper([this.el]);
+
+    // Options are built from optional default options - this can
     // be a property or a function that returns an object, the
     // element attributes, and finally any options passed to the constructor
     this.options = extend(
@@ -677,12 +680,11 @@ function Component (element, options) {
     element.setAttribute('is', this.name);
     element.setAttribute(dataComponentIdAttribute, this._id);
 
-    this._events = [];
+    // store this instance
+    componentInstances[this._id] = this;
 
     this.init();
-
     this.setupEvents(this.registerEvent.bind(this));
-
     this.render();
 }
 
