@@ -666,8 +666,8 @@
   function Component (element, options) {
 
       if (arguments.length === 1 && isObject(element)) {
-         options = element;
-         element = this.createRootElement();
+          options = element;
+          element = this.createRootElement();
       }
 
       if (!arguments.length) {
@@ -749,7 +749,7 @@
           var templateIsString = isString(template);
 
           if (templateIsFunction || templateIsString) {
-              this.el.innerHTML = templateIsFunction ? template(this) : template;
+              this.el.innerHTML = templateIsFunction ? template.call(this, this) : template;
               this.parse();
           }
 

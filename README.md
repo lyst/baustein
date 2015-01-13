@@ -15,35 +15,30 @@ The design goals are:
 
 ## Examples
 
-Lets start with something very simple, listen for click events on a button and write something to the console. To do this using jQuery we would do something like this.
+If you normally use jQuery to add some behaviour to your website then you probably do something a bit like this.
 
 ```html
-<button class=".my-button">Click Me</button>
+<button class="my-button">Click Me</button>
 ```
 
 ```js
-// wait for the DOM to be ready
-$(function () {
-
-    // find the button and attach a click handler
-    $('.my-button').on('click', function () {
-        console.log('button was clicked');
-    });
-
+// find the button and attach a click handler
+$('.my-button').on('click', function (event) {
+    console.log('button was clicked');
 });
 ```
 
-The same thing using **components.js** looks like this:
+The same thing using **components** looks like this:
 
 ```html
-<button class=".my-button" data-component-name="my-button">Click Me</button>
+<button class="my-button" is="my-button">Click Me</button>
 ```
 
 ```js
 components.register('my-button', {
 
-    events: {
-        'click': 'onClick'
+    setupEvents: function (add) {
+        add('click', this.onClick);
     },
 
     onClick: function (event) {
@@ -53,17 +48,17 @@ components.register('my-button', {
 });
 ```
 
-By using `data-` attributes the behaviour added by JavaScript is not tied to a particular class or id. If you are familiar with Custom Elements (a part of the Web Components spec) you will notice that the registering a custom element is similar. To register a component you provide a name and an object to be used for that components prototype. The event handling syntax is similar to Backbone's.
+Notice the `is` attribute - this tells **components** that it should create an instance of the `my-button` component for this element. The behaviour added by JavaScript is not tied to a particular class or id. If you are familiar with Custom Elements (a part of the Web Components spec) you will notice that the registering a custom element is the same. This is intentional, so that as Web Components become available in more browsers **components** can disappear.
 
-Components are statefull so if you have multiple buttons and you want to keep track of how many times each one has been clicked then you could do the following.
+Each component instance has it's own state so if you wanted to have lots of `my-button` components on a page and you want to keep track of how many times each one has been clicked then you could do the following.
 
 ```js
 components.register('my-button', {
 
     clickCount: 0,
 
-    events: {
-        'click': 'onClick'
+    setupEvents: function (add) {
+        add('click', this.onClick);
     },
 
     onClick: function (event) {
@@ -75,45 +70,20 @@ components.register('my-button', {
 ```
 
 
-## DOM Events
-**components.js** uses event delegation to dispatch events to the correct component. The following example shows how the events system works.
-
-```js
-components.register('my-element', {
-
-    events: {
-        'click': 'onClick',
-        '.some-element:click': 'onSomeElementClick'
-    },
-    
-    // called whenever a click event happens on the root element
-    onClick: function (event) {},
-    
-    // called whenever a click event happens on an element 
-    // matching the selector '.some-element'
-    // the second argument is the element
-    onSomeElementClick: function (event, element) {}
-
-});
-```
-
-**components.js** will not automatically start listening for events, you need to call `components.bindEvents()` after the DOM is ready. 
-
-
 ## Custom Events
 A component can emit events that can be listened to by any parent components. This is useful for converting DOM events like `click` into more semantic event like `save` or `edit`. Custom events from child components are subscribed too in the same way as DOM events. The following example shows how this works.
 
 ```html
-<div data-component-name="user-profile">
-    <div data-component-name="user-settings"></div>
+<div is="user-profile">
+    <div is="user-settings"></div>
 </div>
 ```
 
 ```js
 components.register('user-profile', {
 
-    events: {
-        'user-settings:save': 'onSettingsSave'
+    setupEvents: function (add) {
+        add('user-settings', 'save', this.onSettingsSave);
     },
     
     onSettingsSave: function (event) {
@@ -125,11 +95,11 @@ components.register('user-profile', {
 
 components.register('user-settings', {
 
-    events: {
-        '.some-form:submit': 'onSubmit'
+    setupEvents: function (add) {
+        add('.some-form', 'submit', this.onSubmit);
     },
     
-    onSubmit: functon (event, form) {
+    onSubmit: function (event, form) {
         event.preventDefault();
         this.emit('save', {
             formData: new FormData(form)
@@ -141,43 +111,41 @@ components.register('user-settings', {
 
 
 ## Working with server rendered HTML
-A major design goal of **components.js** is to be able to work with server rendered HTML pages. Rendering on the server has been shown to be the fastest way of getting content to the user for the initial page load, and then progressively enhancing the page with JS. To parse the DOM for components you use `components.parse()` which optionally accepts an element to parse if you know you don't need to parse the whole `<body>`. When a component is created from an exisiting DOM element it's `data-` attributes will be parsed into the instances `options` object.
+A major design goal of **components.js** is to be able to work with server rendered HTML pages. Rendering the first page on the server has been shown to be the fastest way of getting content to the user for the initial page load. To parse the DOM for components you use `components.parse()` which optionally accepts an element to parse if you know you don't need to parse the whole `<body>`. When a component is created from an existing DOM element it's attributes will be parsed into the instances `options` object.
 
-When a component is created it's `init()` method will be called and then it's `render()` method. This provides an opportunity to do any intialisation or add any additional markup that is only needed when JS is enabled.
+When a component is created it's `init()` method will be called and then it's `render()` method. This provides an opportunity to do any initialisation or add any additional markup that is only needed when JS is enabled.
 
 
-## Creating components programatically
+## Creating components programmatically
 Once the page has loaded and the user starts interacting with your UI you will probably want to create new components. This can be done by using the classes returned by `components.register()`.
 
 ```js
 var MyComponent = components.register('my-component', {
 
-    template: '<p>Hello my name is ${ options.name }</p>',
+    template: function (component) {
+        return '<p>Hello my name is ' + component.options.name + '</p>';
+    }
 
 });
 
-var myComponent = new MyComponent(null, {
+var myComponent = new MyComponent({
     name: 'Jon'
 });
 
-// prints:
-// <div data-component-name="my-component" data-component-id="4">
+myComponent.appendTo(document.body)
+
+// would append the following HTML to the body:
+// <div is="my-component">
 //     <p>Hello my name is Jon</p>
 // </div>
-console.log(myComponent.el.outerHTML);
 ```
 
-The previous example needs some explaining. This is what happens when you create a component instance programatically.
+Lets go through what happens when you create a component instance in this way.
 
-* A root element is created. The tagName used is `this.tagName` which by default is `div`
-* If an options object is passed as the second argument it is mixed into `this.options`
-* `init()` is called - this is a noop by default
-* `render()` is called
-
-If `this.template` is a string then it will formatted using ES6 style interpolation with `this` as the context. Paths are possible, for example `${ options.name}` as shown in the above example.
+* A root element is created using the components `createRootElement` method, which can be overridden per component. Be default it creates a new element using `this.tagName` which by default is `div`.
+* If an options object is passed as the second argument it is mixed into `this.options`.
+* `init()` is called - this is a noop by default.
+* `setupEvents()` is called and is passed a bound version of `registerEvent` for convenience.
+* `render()` is called.
 
 If `this.template` is a function it will be called with `this` as the first argument and the context, and the return value will be used to set `this.el.innerHTML`.
-
-In most applications you will want to override the `render()` method so you can use whatever templating library you wish to, but the default implementation may be enough in simple cases. 
-
-
