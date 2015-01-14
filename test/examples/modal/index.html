@@ -3,12 +3,11 @@
 <head>
     <meta charset="utf-8">
     <title>component example - modal</title>
-    <link href="modal.css" rel="stylesheet">
     <style>
-        [data-component-name="my-button"] {
+        [is="my-button"] {
             margin: 10px;
         }
-        [data-component-name="my-overlay"] {
+        [is="my-overlay"] {
             position: absolute;
             top: 0;
             left: 0;
@@ -16,9 +15,10 @@
             bottom: 0;
             background-color: rgba(0,0,0,0.5);
             -webkit-transition: all 500ms ease;
+            transition: all 500ms ease;
             opacity: 0;
         }
-        [data-component-name="my-overlay"].show {
+        [is="my-overlay"].show {
             opacity: 1;
         }
         .my-overlay-content {
@@ -30,12 +30,13 @@
             padding: 20px;
             background-color: white;
             border: 2px solid black;
-            -webkit-transform: translate3d(0, 100px, 0);
-            -webkit-transition: all 250ms ease;
-            -webkit-transition-delay: 250ms;
+            -webkit-transform: translate3d(0, -50px, 0);
+            transform: translate3d(0, -50px, 0);
+            -webkit-transition: all 250ms ease 250ms;
+            transition: all 250ms ease 250ms;
             opacity: 0;
         }
-        [data-component-name="my-overlay"].show .my-overlay-content {
+        [is="my-overlay"].show .my-overlay-content {
             -webkit-transform: translate3d(0, 0, 0);
             opacity: 1;
         }
@@ -43,50 +44,45 @@
 </head>
 <body>
 
-<div data-component-name="my-app">
+<div is="my-app">
 
-    <button data-component-name="my-button" data-id="1">Click Me</button>
-    <button data-component-name="my-button" data-id="2">Click Me</button>
-    <button data-component-name="my-button" data-id="3">Click Me</button>
-    <button data-component-name="my-button" data-id="4">Click Me</button>
+    <button is="my-button" id="1">Click Me</button>
+    <button is="my-button" id="2">Click Me</button>
+    <button is="my-button" id="3">Click Me</button>
+    <button is="my-button" id="4">Click Me</button>
 
 </div>
 
 <script type="x-template" id="my-overlay-template">
     <div class="my-overlay-content">
-        <p>Hello! You clicked button with id: <strong>${options.id}</strong></p>
+        <p>Hello! You clicked button with id: <strong>{{ id }}</strong></p>
         <p><button class="my-overlay-close-button">Close Me</button></p>
     </div>
 </script>
 
 
-<script src="../../../src/components.js"></script>
+<script src="../../../dist/components.globals.js"></script>
 <script>
 
     components.register('my-app', {
 
-        events: {
-            'my-button:open-overlay': 'openOverlay',
-            'my-overlay:close': 'onOverlayClose'
+        setupEvents: function (add) {
+            add('open-overlay', 'my-button', this.openOverlay);
         },
 
         openOverlay: function (event) {
-            var overlay = new MyOverlay(null, {
+            var overlay = new MyOverlay({
                 id: event.id
             });
             overlay.appendTo(this.el);
-        },
-
-        onOverlayClose: function (event) {
-
         }
 
     });
 
     components.register('my-button', {
 
-        events: {
-            'click': 'onClick'
+        setupEvents: function (add) {
+            add('click', this.onClick);
         },
 
         onClick: function () {
@@ -99,14 +95,20 @@
 
     var MyOverlay = components.register('my-overlay', {
 
-        template: document.getElementById('my-overlay-template').innerHTML,
+        template: function () {
+            var template = document.getElementById('my-overlay-template').innerHTML;
+            return template.replace(/\{\{ id \}\}/g, this.options.id);
+        },
 
-        events: {
-            'click': 'onBackdropClick',
-            '.my-overlay-close-button:click': 'close'
+        setupEvents: function (add) {
+            add('click', this.onBackdropClick);
+            add('click', '.my-overlay-close-button', this.close);
         },
 
         onInsert: function () {
+            // trigger a re-flow on this element
+            this.el.offsetLeft;
+
             requestAnimationFrame(function () {
                 this.el.classList.add('show');
             }.bind(this));
@@ -125,8 +127,7 @@
 
     });
 
-    components.bindEvents();
-    components.parse();
+    components.init();
 
 </script>
 </body>

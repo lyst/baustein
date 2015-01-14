@@ -7,7 +7,8 @@
 </head>
 <body>
 
-<div data-component-name="todos-app" id="todoapp"></div>
+<div is="todos-app" id="todoapp"></div>
+
 <footer id="info">
     <p>Double-click to edit a todo</p>
 </footer>
@@ -15,13 +16,13 @@
 <script type="x-template" id="todos-app-template">
     <header id="header">
         <h1>todos</h1>
-        <form data-component-name="todos-form"></form>
+        <form is="todos-form"></form>
     </header>
     <div id="main" class="hidden">
         <input id="toggle-all" type="checkbox">
         <ul id="todo-list"></ul>
     </div>
-    <footer id="footer" class="hidden" data-component-name="todos-footer"></footer>
+    <footer id="footer" class="hidden" is="todos-footer"></footer>
 </script>
 
 <script type="x-template" id="todos-footer-template">
@@ -42,51 +43,48 @@
 
 <script type="x-template" id="todo-item-template">
     <input class="toggle view" type="checkbox">
-    <label class="view">${options.title}</label>
+    <label class="view">{{ title }}</label>
     <button class="destroy view"></button>
     <form>
-        <input class="edit" value="${options.title}">
+        <input class="edit" value="{{ title }}">
     </form>
 </script>
 
-<script src="../../../src/components.js"></script>
+<script src="../../../dist/components.globals.js"></script>
 <script>
 
     components.register('todos-app', {
 
         template: document.getElementById('todos-app-template').innerHTML,
 
-        events: {
-            'todos-form:new-todo': 'onNewTodoSave',
-
-            'todos-footer:clear-completed': 'onClearCompleted',
-            'todos-footer:filter-selected': 'onFilterSelected',
-
-            'todo-item:destroy': 'updateCounts',
-            'todo-item:status-change': 'updateCounts',
-
-            '#toggle-all:change': 'onToggleAll'
+        setupEvents: function (add) {
+            add('new-todo', 'todos-form', this.onNewTodoSave);
+            add('clear-completed', 'todos-footer', this.onClearCompleted);
+            add('filter-selected', 'todos-footer', this.onFilterSelected);
+            add('destroy', 'todo-item', this.updateCounts);
+            add('status-change', 'todo-item', this.updateCounts);
+            add('change', '#toggle-all', this.onToggleAll);
         },
 
         onNewTodoSave: function (event) {
 
-            var todoItem = new ToDoItem(null, {
+            var todoItem = new ToDoItem({
                 title: event.title
             });
 
-            todoItem.appendTo(this.find('#todo-list'));
+            todoItem.appendTo(this.find('#todo-list')[0]);
             this.updateCounts();
         },
 
         onToggleAll: function (event, input) {
             this.invoke(
-                this.findAllComponents('todo-item'),
+                this.findComponents('todo-item'),
                 input.checked ? 'select' : 'deselect'
             );
         },
 
         onClearCompleted: function () {
-            this.findAllComponents('todo-item').forEach(function (todoItem) {
+            this.findComponents('todo-item').forEach(function (todoItem) {
                 if (todoItem.isComplete()) {
                     todoItem.destroy();
                 }
@@ -95,7 +93,7 @@
 
         onFilterSelected: function (event) {
             var filter = event.filter;
-            var main = this.find('#main');
+            var main = this.find('#main')[0];
 
             ['all', 'completed', 'active'].forEach(function (f) {
                 main.classList[f === filter ? 'add' : 'remove'](f);
@@ -103,7 +101,7 @@
         },
 
         getCounts: function () {
-            return this.findAllComponents('todo-item').reduce(function (result, todoItem) {
+            return this.findComponents('todo-item').reduce(function (result, todoItem) {
 
                 if (todoItem.isComplete()) {
                     result.complete += 1;
@@ -121,8 +119,8 @@
         updateCounts: function () {
 
             var counts = this.getCounts();
-            var main = this.find('#main');
-            var footer = this.find('#footer');
+            var main = this.find('#main')[0];
+            var footer = this.find('#footer')[0];
 
             if (!counts.total) {
                 main.classList.add('hidden');
@@ -130,14 +128,14 @@
                 return;
             }
 
-            this.find('#toggle-all').checked = counts.complete === counts.total;
+            this.find('#toggle-all')[0].checked = counts.complete === counts.total;
 
             main.classList.remove('hidden');
             footer.classList.remove('hidden');
-            this.find('.todos-total-count').innerHTML = counts.active + ' item(s) left';
+            this.find('.todos-total-count')[0].innerHTML = counts.active + ' item(s) left';
 
-            this.find('.todos-completed-count').innerHTML = counts.complete;
-            this.find('#clear-completed').classList[counts.complete ? 'remove' : 'add']('hidden');
+            this.find('.todos-completed-count')[0].innerHTML = counts.complete;
+            this.find('#clear-completed')[0].classList[counts.complete ? 'remove' : 'add']('hidden');
         }
 
     });
@@ -146,14 +144,14 @@
 
         template: document.getElementById('todos-form-template').innerHTML,
 
-        events: {
-            'submit': 'onSave'
+        setupEvents: function (add) {
+            add('submit', this.onSave);
         },
 
         onSave: function (event) {
             event.preventDefault();
 
-            var input = this.find('[name=todo-name]');
+            var input = this.find('[name=todo-name]')[0];
             var title = input.value;
             input.value = '';
 
@@ -172,9 +170,9 @@
 
         template: document.getElementById('todos-footer-template').innerHTML,
 
-        events: {
-            '#clear-completed:click': 'onClearCompleted',
-            '.todos-filter:click': 'onFilterSelected'
+        setupEvents: function (add) {
+            add('click', '#clear-completed', this.onClearCompleted);
+            add('click', '.todos-filter', this.onFilterSelected);
         },
 
         onClearCompleted: function () {
@@ -188,7 +186,7 @@
                 return;
             }
 
-            this.findAll('.todos-filter').forEach(function (l) {
+            this.find('.todos-filter').forEach(function (l) {
                 l.classList[l === link ? 'add' : 'remove']('selected');
             });
 
@@ -204,15 +202,18 @@
 
         tagName: 'li',
 
-        template: document.getElementById('todo-item-template').innerHTML,
+        template: function () {
+            var template = document.getElementById('todo-item-template').innerHTML;
+            return template.replace(/\{\{ title \}\}/g, this.options.title);
+        },
 
-        events: {
-            '.toggle:change': 'onStateChange',
-            'label:dblclick': 'onEditTitle',
-            '.edit:blur': 'onDoneEditingTitle',
-            '.edit:keyup': 'onTitleChange',
-            'form:submit': 'onDoneEditingTitle',
-            '.destroy:click': 'destroy'
+        setupEvents: function (add) {
+            add('change', '.toggle', this.onStateChange);
+            add('dblclick', 'label', this.onEditTitle);
+            add('blur', '.edit', this.onDoneEditingTitle);
+            add('keyup', '.edit', this.onTitleChange);
+            add('submit', 'form', this.onDoneEditingTitle);
+            add('click', '.destroy', this.destroy);
         },
 
         init: function () {
@@ -221,7 +222,7 @@
 
         onEditTitle: function () {
             this.el.classList.add('editing');
-            var input = this.find('.edit');
+            var input = this.find('.edit')[0];
             input.selectionStart = input.selectionEnd = this.options.title.length;
         },
 
@@ -231,8 +232,9 @@
 
         onDoneEditingTitle: function (event) {
             event.preventDefault();
+            console.log('ok');
             this.el.classList.remove('editing');
-            this.find('label.view').innerHTML = this.options.title;
+            this.find('label.view')[0].innerHTML = this.options.title;
         },
 
         onStateChange: function (event, input) {
@@ -240,12 +242,12 @@
         },
 
         select: function () {
-            this.find('.toggle').checked = true;
+            this.find('.toggle')[0].checked = true;
             this._update(true);
         },
 
         deselect: function () {
-            this.find('.toggle').checked = false;
+            this.find('.toggle')[0].checked = false;
             this._update(false);
         },
 
@@ -269,8 +271,7 @@
 
     });
 
-    components.bindEvents();
-    components.parse();
+    components.init();
 
 </script>
 </body>
