@@ -680,6 +680,87 @@ describe('components', function () {
 
         });
 
+        describe('#insertBefore(element)', function() {
+
+            it('should return this', function() {
+                var c = new Component();
+                expect(c.insertBefore()).to.equal(c);
+            });
+
+            it('should insert itself before the child element', function() {
+
+                var root = document.createElement('div');
+                var child1 = document.createElement('span');
+                var child2 = document.createElement('span');
+                root.appendChild(child1);
+                root.appendChild(child2);
+
+                var c = new Component();
+                c.insertBefore(child2);
+                expect(root.children[0]).to.equal(child1);
+                expect(root.children[1]).to.equal(c.el);
+                expect(root.children[2]).to.equal(child2);
+
+            });
+
+        });
+
+        describe('#insertAfter(element)', function() {
+
+            it('should return this', function() {
+                var c = new Component();
+                expect(c.insertAfter()).to.equal(c);
+            });
+
+
+            it('should insert itself after the child element', function() {
+
+                var root = document.createElement('div');
+                var child1 = document.createElement('span');
+                var child2 = document.createElement('span');
+                root.appendChild(child1);
+                root.appendChild(child2);
+
+                var c = new Component();
+                c.insertAfter(child1);
+                expect(root.children[0]).to.equal(child1);
+                expect(root.children[1]).to.equal(c.el);
+                expect(root.children[2]).to.equal(child2);
+
+            });
+
+            it('should insert itself as the last child if inserted after the last child', function() {
+                var root = document.createElement('div');
+                var child = document.createElement('span');
+                root.appendChild(child);
+
+                var c = new Component();
+                c.insertAfter(child);
+                expect(root.children[0]).to.equal(child);
+                expect(root.children[1]).to.equal(c.el);
+            });
+
+            it ('should insert immediately after the first child, not after a text node', function() {
+
+                var root = document.createElement('div');
+                var child1 = document.createElement('span');
+                var textNode = document.createTextNode('I am some text');
+                var child2 = document.createElement('span');
+                root.appendChild(child1);
+                root.appendChild(textNode);
+                root.appendChild(child2);
+
+                var c = new Component();
+                c.insertAfter(child1);
+                expect(root.childNodes[0]).to.equal(child1);
+                expect(root.childNodes[1]).to.equal(c.el);
+                expect(root.childNodes[2]).to.equal(textNode);
+                expect(root.childNodes[3]).to.equal(child2);
+
+            });
+
+        });
+
         describe('#getInstanceOf(name)', function () {
 
             it('should return a instance or undefined', function () {
