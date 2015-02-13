@@ -781,6 +781,56 @@ Component.prototype = {
     },
 
     /**
+     * Inserts this component before another element.
+     * @param {HTMLElement} el the element to go before
+     * @returns {Component}
+     */
+    insertBefore: function(el) {
+
+        el = isElement(el) ? el : isComponent(el) ? el.el : null;
+
+        if (!el) {
+            return this;
+        }
+
+        var parent = el.parentElement;
+        if (parent) {
+            this.beforeInsert();
+            parent.insertBefore(this.el, el);
+            this.onInsert();
+            this.emit('inserted');
+        }
+
+        return this;
+    },
+
+    /**
+     * Inserts this component after another element.
+     * @param {HTMLElement} el the element to go after
+     * @returns {Component}
+     */
+    insertAfter: function(el) {
+
+        el = isElement(el) ? el : isComponent(el) ? el.el : null;
+
+        if (!el) {
+            return this;
+        }
+
+        // no insertAfter, so insert before the next sibling
+        // null case automatically handled
+        var parent = el.parentNode;
+        if (parent) {
+            this.beforeInsert();
+            parent.insertBefore(this.el, el.nextSibling);
+            this.onInsert();
+            this.emit('inserted');
+        }
+
+        return this;
+    },
+
+    /**
      * Appends this Component to an element.
      * @param {HTMLElement} el
      * @returns {Component}
