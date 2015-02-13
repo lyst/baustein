@@ -284,6 +284,7 @@ define(
         return new componentClasses[name](el);
     }
 
+    __exports__.fromElement = fromElement;
     /**
      * Given an array of Component instances invokes 'method' on each one.
      * Any additional arguments are passed to the method.
@@ -354,6 +355,7 @@ define(
         return component instanceof Component;
     }
 
+    __exports__.isComponent = isComponent;
     /**
      * Handles all events - both standard DOM events and custom Component events.
      *
@@ -468,6 +470,7 @@ define(
         }
     }
 
+    __exports__.handleEvent = handleEvent;
     /**
      * Parses the given element or the root element and creates Component instances.
      * @param {HTMLElement} [root]
@@ -497,6 +500,7 @@ define(
         }, []);
     }
 
+    __exports__.parse = parse;
     /**
      * Registers a new Component.
      * @param {String|Object} name
@@ -537,6 +541,7 @@ define(
         return F;
     }
 
+    __exports__.register = register;
     /**
      * Un-registers a Component class and destroys any existing instances.
      * @param {string} name
@@ -546,6 +551,7 @@ define(
         componentClasses[name] = null;
     }
 
+    __exports__.unregister = unregister;
     /**
      *
      * @param {string} method
@@ -569,6 +575,7 @@ define(
         eventManager('addEventListener');
     }
 
+    __exports__.bindEvents = bindEvents;
     /**
      * Unbinds all events.
      */
@@ -576,6 +583,7 @@ define(
         eventManager('removeEventListener');
     }
 
+    __exports__.unbindEvents = unbindEvents;
     /**
      * Initialises the components library by parsing the DOM and binding events.
      * @param {object} [options]
@@ -599,6 +607,7 @@ define(
         bindEvents();
     }
 
+    __exports__.init = init;
     /**
      * Opposite of `init`. Destroys all component instances and un-registers all components.
      * Resets the `domQuery` and `domWrapper` functions to their defaults.
@@ -622,6 +631,7 @@ define(
         unbindEvents();
     }
 
+    __exports__.reset = reset;
     /**
      * @param {string} name
      * @returns {Object}
@@ -630,6 +640,7 @@ define(
         return getInstancesOf(name)[0];
     }
 
+    __exports__.getInstanceOf = getInstanceOf;
     /**
      * @param {string} name
      * @returns {Array}
@@ -647,18 +658,19 @@ define(
         return result;
     }
 
+    __exports__.getInstancesOf = getInstancesOf;
     /**
      * @param {string} name
-     * @returns {object}
      */
     function destroy(name) {
         getInstancesOf(name).forEach(function(instance) {
             instance.destroy();
         });
 
-        return components;
+        return this;
     }
 
+    __exports__.destroy = destroy;
     /**
      * Creates a new Component
      * @param element
@@ -709,6 +721,7 @@ define(
         this.render();
     }
 
+    __exports__.Component = Component;
     Component.prototype = {
 
         name: '',
@@ -1097,21 +1110,4 @@ define(
         }
 
     };
-
-    var components = {
-        Component: Component,
-        init: init,
-        reset: reset,
-        bindEvents: bindEvents,
-        handleEvent: handleEvent,
-        parse: parse,
-        register: register,
-        unregister: unregister,
-        fromElement: fromElement,
-        isComponent: isComponent,
-        getInstancesOf: getInstancesOf,
-        getInstanceOf: getInstanceOf,
-        destroy: destroy
-    };
-    __exports__.components = components;
   });

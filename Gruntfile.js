@@ -30,8 +30,7 @@ module.exports = function (grunt) {
             all: {
                 files: {
                     'dist/components.amd.min.js': ['dist/components.amd.js'],
-                    'dist/components.cjs.min.js': ['dist/components.cjs.js'],
-                    'dist/components.globals.min.js': ['dist/components.globals.js']
+                    'dist/components.cjs.min.js': ['dist/components.cjs.js']
                 }
             }
         },
@@ -55,15 +54,6 @@ module.exports = function (grunt) {
                         dest: 'dist/components.amd.js'
                     }
                 ]
-            },
-            globals: {
-                type: "globals",
-                files: [
-                    {
-                        src: 'src/components.js',
-                        dest: 'dist/components.globals.js'
-                    }
-                ]
             }
         },
 
@@ -71,11 +61,18 @@ module.exports = function (grunt) {
             unitTests: {
                 singleRun: true,
                 browsers: ['PhantomJS'],
-                frameworks: ['mocha', 'sinon', 'expect'],
+                frameworks: ['requirejs', 'mocha', 'sinon', 'expect'],
                 options: {
                     files: [
-                        'dist/components.globals.js',
-                        'test/spec/components.js'
+                        'test/test-runner.js',
+                        {
+                            pattern: 'dist/**/*.js',
+                            included: false
+                        },
+                        {
+                            pattern: 'test/spec/**/*.js',
+                            included: false
+                        }
                     ],
                     reporters: ['mocha', 'coverage'],
                     preprocessors: {
