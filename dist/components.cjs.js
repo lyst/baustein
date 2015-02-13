@@ -281,6 +281,7 @@ function fromElement(el) {
     return new componentClasses[name](el);
 }
 
+exports.fromElement = fromElement;
 /**
  * Given an array of Component instances invokes 'method' on each one.
  * Any additional arguments are passed to the method.
@@ -351,6 +352,7 @@ function isComponent(component) {
     return component instanceof Component;
 }
 
+exports.isComponent = isComponent;
 /**
  * Handles all events - both standard DOM events and custom Component events.
  *
@@ -465,6 +467,7 @@ function handleEvent(event, componentsChain) {
     }
 }
 
+exports.handleEvent = handleEvent;
 /**
  * Parses the given element or the root element and creates Component instances.
  * @param {HTMLElement} [root]
@@ -494,6 +497,7 @@ function parse(root) {
     }, []);
 }
 
+exports.parse = parse;
 /**
  * Registers a new Component.
  * @param {String|Object} name
@@ -534,6 +538,7 @@ function register(name, impl) {
     return F;
 }
 
+exports.register = register;
 /**
  * Un-registers a Component class and destroys any existing instances.
  * @param {string} name
@@ -543,6 +548,7 @@ function unregister(name) {
     componentClasses[name] = null;
 }
 
+exports.unregister = unregister;
 /**
  *
  * @param {string} method
@@ -566,6 +572,7 @@ function bindEvents() {
     eventManager('addEventListener');
 }
 
+exports.bindEvents = bindEvents;
 /**
  * Unbinds all events.
  */
@@ -573,6 +580,7 @@ function unbindEvents() {
     eventManager('removeEventListener');
 }
 
+exports.unbindEvents = unbindEvents;
 /**
  * Initialises the components library by parsing the DOM and binding events.
  * @param {object} [options]
@@ -596,6 +604,7 @@ function init(options) {
     bindEvents();
 }
 
+exports.init = init;
 /**
  * Opposite of `init`. Destroys all component instances and un-registers all components.
  * Resets the `domQuery` and `domWrapper` functions to their defaults.
@@ -619,6 +628,7 @@ function reset() {
     unbindEvents();
 }
 
+exports.reset = reset;
 /**
  * @param {string} name
  * @returns {Object}
@@ -627,6 +637,7 @@ function getInstanceOf(name) {
     return getInstancesOf(name)[0];
 }
 
+exports.getInstanceOf = getInstanceOf;
 /**
  * @param {string} name
  * @returns {Array}
@@ -644,18 +655,19 @@ function getInstancesOf(name) {
     return result;
 }
 
+exports.getInstancesOf = getInstancesOf;
 /**
  * @param {string} name
- * @returns {object}
  */
 function destroy(name) {
     getInstancesOf(name).forEach(function(instance) {
         instance.destroy();
     });
 
-    return components;
+    return this;
 }
 
+exports.destroy = destroy;
 /**
  * Creates a new Component
  * @param element
@@ -706,6 +718,7 @@ function Component (element, options) {
     this.render();
 }
 
+exports.Component = Component;
 Component.prototype = {
 
     name: '',
@@ -1094,20 +1107,3 @@ Component.prototype = {
     }
 
 };
-
-var components = {
-    Component: Component,
-    init: init,
-    reset: reset,
-    bindEvents: bindEvents,
-    handleEvent: handleEvent,
-    parse: parse,
-    register: register,
-    unregister: unregister,
-    fromElement: fromElement,
-    isComponent: isComponent,
-    getInstancesOf: getInstancesOf,
-    getInstanceOf: getInstanceOf,
-    destroy: destroy
-};
-exports.components = components;

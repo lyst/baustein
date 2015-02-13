@@ -250,7 +250,7 @@ function parentComponents(element) {
  * then it is returned, if not a new instance of the correct Component is created.
  * @param {HTMLElement} el
  */
-function fromElement(el) {
+export function fromElement(el) {
 
     var name;
     var id;
@@ -346,7 +346,7 @@ function parseAttributes(el) {
  * @param component
  * @returns {boolean}
  */
-function isComponent(component) {
+export function isComponent(component) {
     return component instanceof Component;
 }
 
@@ -363,7 +363,7 @@ function isComponent(component) {
  * @param {Component[]} [componentsChain] Only used internally when a chain of
  *                                        Components is already available.
  */
-function handleEvent(event, componentsChain) {
+export function handleEvent(event, componentsChain) {
 
     // this will be a DOM element or a Component
     // component event objects are created in Component.prototype.emit
@@ -469,7 +469,7 @@ function handleEvent(event, componentsChain) {
  * @param {HTMLElement} [root]
  * @returns {Component[]}
  */
-function parse(root) {
+export function parse(root) {
 
     // allow DOM element or nothing
     root = isElement(root) ? root : doc.body;
@@ -499,7 +499,7 @@ function parse(root) {
  * @param {Object} [impl] The implementation methods / properties.
  * @returns {Function}
  */
-function register(name, impl) {
+export function register(name, impl) {
 
     var F, Surrogate;
 
@@ -537,7 +537,7 @@ function register(name, impl) {
  * Un-registers a Component class and destroys any existing instances.
  * @param {string} name
  */
-function unregister(name) {
+export function unregister(name) {
     destroy(name);
     componentClasses[name] = null;
 }
@@ -561,14 +561,14 @@ function eventManager(method) {
 /**
  * Binds all events.
  */
-function bindEvents() {
+export function bindEvents() {
     eventManager('addEventListener');
 }
 
 /**
  * Unbinds all events.
  */
-function unbindEvents() {
+export function unbindEvents() {
     eventManager('removeEventListener');
 }
 
@@ -579,7 +579,7 @@ function unbindEvents() {
  * @param {function} [options.domWrapper] A custom function to use to wrap the results
  *                                        of DOM queries.
  */
-function init(options) {
+export function init(options) {
 
     options = options || {};
 
@@ -599,7 +599,7 @@ function init(options) {
  * Opposite of `init`. Destroys all component instances and un-registers all components.
  * Resets the `domQuery` and `domWrapper` functions to their defaults.
  */
-function reset() {
+export function reset() {
 
     // destroy any component instances
     for (var key in componentInstances) {
@@ -622,7 +622,7 @@ function reset() {
  * @param {string} name
  * @returns {Object}
  */
-function getInstanceOf(name) {
+export function getInstanceOf(name) {
     return getInstancesOf(name)[0];
 }
 
@@ -630,7 +630,7 @@ function getInstanceOf(name) {
  * @param {string} name
  * @returns {Array}
  */
-function getInstancesOf(name) {
+export function getInstancesOf(name) {
 
     var result = [];
 
@@ -645,14 +645,13 @@ function getInstancesOf(name) {
 
 /**
  * @param {string} name
- * @returns {object}
  */
-function destroy(name) {
+export function destroy(name) {
     getInstancesOf(name).forEach(function(instance) {
         instance.destroy();
     });
 
-    return components;
+    return this;
 }
 
 /**
@@ -661,7 +660,7 @@ function destroy(name) {
  * @param options
  * @constructor
  */
-function Component (element, options) {
+export function Component (element, options) {
 
     if (arguments.length === 1 && isObject(element)) {
         options = element;
@@ -1092,20 +1091,4 @@ Component.prototype = {
         return this;
     }
 
-};
-
-export var components = {
-    Component: Component,
-    init: init,
-    reset: reset,
-    bindEvents: bindEvents,
-    handleEvent: handleEvent,
-    parse: parse,
-    register: register,
-    unregister: unregister,
-    fromElement: fromElement,
-    isComponent: isComponent,
-    getInstancesOf: getInstancesOf,
-    getInstanceOf: getInstanceOf,
-    destroy: destroy
 };
