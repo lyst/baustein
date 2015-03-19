@@ -4,7 +4,7 @@ requirejs.config({
 
     // ask Require.js to load these files (all our tests and polyfills)
     deps: [
-        'base/test/spec/components.js'
+        'base/test/spec/baustein.js'
     ],
 
     // start test run, once Require.js is done

@@ -29,8 +29,8 @@ module.exports = function (grunt) {
         uglify: {
             all: {
                 files: {
-                    'dist/components.amd.min.js': ['dist/components.amd.js'],
-                    'dist/components.cjs.min.js': ['dist/components.cjs.js']
+                    'dist/baustein.amd.min.js': ['dist/baustein.amd.js'],
+                    'dist/baustein.cjs.min.js': ['dist/baustein.cjs.js']
                 }
             }
         },
@@ -40,8 +40,8 @@ module.exports = function (grunt) {
                 type: "cjs",
                 files: [
                     {
-                        src: 'src/components.js',
-                        dest: 'dist/components.cjs.js'
+                        src: 'src/baustein.js',
+                        dest: 'dist/baustein.cjs.js'
                     }
                 ]
             },
@@ -50,8 +50,8 @@ module.exports = function (grunt) {
                 type: "amd",
                 files: [
                     {
-                        src: 'src/components.js',
-                        dest: 'dist/components.amd.js'
+                        src: 'src/baustein.js',
+                        dest: 'dist/baustein.amd.js'
                     }
                 ]
             }

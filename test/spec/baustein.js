@@ -1,4 +1,4 @@
-define(['../../dist/components.amd.js'], function (components) {
+define(['../../dist/baustein.amd.js'], function (baustein) {
 
     // PhantomJS sigh...
     if (!Function.prototype.bind) {
@@ -26,18 +26,18 @@ define(['../../dist/components.amd.js'], function (components) {
 
     describe('components', function () {
 
-        var Component = components.Component;
+        var Component = baustein.Component;
         var testRoot = document.createElement('div');
 
         testRoot.id = 'test-root';
         document.body.appendChild(testRoot);
 
         beforeEach(function () {
-            components.init();
+            baustein.init();
         });
 
         afterEach(function () {
-            components.reset();
+            baustein.reset();
             testRoot.innerHTML = '';
         });
 
@@ -61,7 +61,7 @@ define(['../../dist/components.amd.js'], function (components) {
         describe('components.Component', function () {
 
             it('should be a function', function () {
-                expect(components.Component).to.be.a('function');
+                expect(baustein.Component).to.be.a('function');
             });
 
             it('should create a root element if one is not passed', function () {
@@ -134,7 +134,7 @@ define(['../../dist/components.amd.js'], function (components) {
             it('should use defaultOptions first, then attributes, then passed options', function () {
 
                 var name = createComponentName();
-                var C = components.register(name, {
+                var C = baustein.register(name, {
                     defaultOptions: {
                         foo: 'default value'
                     }
@@ -161,7 +161,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 var registerEvent = sinon.spy();
 
-                var Component1 = components.register(createComponentName(), {
+                var Component1 = baustein.register(createComponentName(), {
                     setupEvents: setupEvents,
                     registerEvent: registerEvent
                 });
@@ -181,7 +181,7 @@ define(['../../dist/components.amd.js'], function (components) {
                 it('can be a function and if it is then it should be called to get default options', function () {
 
                     var name = createComponentName();
-                    var C = components.register(name, {
+                    var C = baustein.register(name, {
                         defaultOptions: sinon.spy()
                     });
 
@@ -198,7 +198,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 it('should be called when creating the component', function () {
                     var spy = sinon.spy();
-                    var NewComponent = components.register(createComponentName(), {
+                    var NewComponent = baustein.register(createComponentName(), {
                         init: spy
                     });
                     var component = new NewComponent();
@@ -215,9 +215,9 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 beforeEach(function () {
                     name = createComponentName();
-                    components.register(name);
+                    baustein.register(name);
                     addTestHTML('<div id="el" is="' + name + '"></div>');
-                    c = components.fromElement(document.getElementById('el'));
+                    c = baustein.fromElement(document.getElementById('el'));
                 });
 
                 it('should remove the element from the DOM', function () {
@@ -241,7 +241,7 @@ define(['../../dist/components.amd.js'], function (components) {
                             expect(this.el.parentElement).to.equal(null);
                         })
                     };
-                    var C = components.register(createComponentName(), def);
+                    var C = baustein.register(createComponentName(), def);
                     var c = new C();
                     c.appendTo(el);
                     c.remove();
@@ -250,7 +250,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 it('should emit the "remove" event', function () {
 
-                    var C = components.register(createComponentName());
+                    var C = baustein.register(createComponentName());
 
                     var def = {
                         setupEvents: function (add) {
@@ -261,7 +261,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                     // this is a component that is listening for the
                     // 'destroy' event from the C component
-                    var C2 = components.register(createComponentName(), def);
+                    var C2 = baustein.register(createComponentName(), def);
 
                     // set up component hierarchy
                     var c1 = new C2();
@@ -294,9 +294,9 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 it('should remove the element, destroy the component instance, and return null', function () {
                     var name = createComponentName();
-                    components.register(name);
+                    baustein.register(name);
                     addTestHTML('<div id="test-el" is="' + name + '"></div>');
-                    var c = components.fromElement(document.getElementById('test-el'));
+                    var c = baustein.fromElement(document.getElementById('test-el'));
                     expect(c.destroy()).to.equal(null);
                     expect(document.getElementById('test-el')).to.equal(null);
                     expect(c.el).to.equal(null);
@@ -307,7 +307,7 @@ define(['../../dist/components.amd.js'], function (components) {
                     var def = {
                         beforeDestroy: sinon.spy()
                     };
-                    var C = components.register(createComponentName(), def);
+                    var C = baustein.register(createComponentName(), def);
 
                     var c1 = new C();
                     var c2 = new C();
@@ -322,7 +322,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 it('should emit the "destroy" event', function () {
 
-                    var C = components.register(createComponentName());
+                    var C = baustein.register(createComponentName());
 
                     var def = {
                         setupEvents: function (add) {
@@ -333,7 +333,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                     // this is a component that is listening for the
                     // 'destroy' event from the C component
-                    var C2 = components.register(createComponentName(), def);
+                    var C2 = baustein.register(createComponentName(), def);
 
                     // set up component hierarchy
                     var c1 = new C2();
@@ -373,7 +373,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                     it('should invoke the function passing "this" as the first argument', function () {
 
-                        var C = components.register(createComponentName(), {
+                        var C = baustein.register(createComponentName(), {
                             template: function (ctx) {
                                 return '<span>' + ctx.options.text + '</span>';
                             }
@@ -393,7 +393,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                         var content = '<span>Hello world</span>';
 
-                        var C = components.register(createComponentName(), {
+                        var C = baustein.register(createComponentName(), {
                             template: content
                         });
 
@@ -431,7 +431,7 @@ define(['../../dist/components.amd.js'], function (components) {
                         someMethod: sinon.spy()
                     };
 
-                    var C = components.register(createComponentName(), def);
+                    var C = baustein.register(createComponentName(), def);
 
                     arr = [new C(), new C(), new C()];
                 });
@@ -517,7 +517,7 @@ define(['../../dist/components.amd.js'], function (components) {
             describe('#findComponent(name)', function () {
 
                 it('should return the first child component with the given name', function () {
-                    var C = components.register(createComponentName());
+                    var C = baustein.register(createComponentName());
                     var c1 = new Component();
                     var c2 = new C();
 
@@ -536,7 +536,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 it('should return an array of all components that match the given name', function () {
 
-                    var C = components.register(createComponentName());
+                    var C = baustein.register(createComponentName());
 
                     var c1 = new Component();
                     var c2 = new C();
@@ -562,8 +562,8 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 it('should return an array of all components that match the given name', function () {
 
-                    var Component1 = components.register(createComponentName());
-                    var Component2 = components.register(createComponentName());
+                    var Component1 = baustein.register(createComponentName());
+                    var Component2 = baustein.register(createComponentName());
 
                     var c1 = new Component1();
                     var c2 = new Component1();
@@ -573,14 +573,14 @@ define(['../../dist/components.amd.js'], function (components) {
                     var arr = [c1, c2, c5];
                     var arr2 = [c3, c4];
 
-                    expect(components.getInstancesOf(c1.name)).to.have.length(3);
-                    expect(components.getInstancesOf(c3.name)).to.have.length(2);
+                    expect(baustein.getInstancesOf(c1.name)).to.have.length(3);
+                    expect(baustein.getInstancesOf(c3.name)).to.have.length(2);
 
-                    components.getInstancesOf(c1.name).forEach(function (c, i) {
+                    baustein.getInstancesOf(c1.name).forEach(function (c, i) {
                         expect(c).to.equal(arr[i]);
                     });
 
-                    components.getInstancesOf(c3.name).forEach(function (c, i) {
+                    baustein.getInstancesOf(c3.name).forEach(function (c, i) {
                         expect(c).to.equal(arr2[i]);
                     });
 
@@ -592,7 +592,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 it('should call handler when emit event on same component', function () {
                     var spy = sinon.spy();
-                    var Component = components.register(createComponentName(), {
+                    var Component = baustein.register(createComponentName(), {
                         setupEvents: function (add) {
                             add('foo', spy);
                         }
@@ -606,13 +606,13 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 it('should call handler on parent component when emit on child', function () {
                     var spy = sinon.spy();
-                    var ComponentParent = components.register(createComponentName(), {
+                    var ComponentParent = baustein.register(createComponentName(), {
                         setupEvents: function (add) {
                             add('foo', spy);
                         }
                     });
 
-                    var ComponentChild = components.register(createComponentName());
+                    var ComponentChild = baustein.register(createComponentName());
 
                     var componentParent = new ComponentParent();
                     var componentChild = new ComponentChild();
@@ -630,7 +630,7 @@ define(['../../dist/components.amd.js'], function (components) {
                         foo: 'bar'
                     };
 
-                    var Component = components.register(createComponentName(), {
+                    var Component = baustein.register(createComponentName(), {
                         setupEvents: function (add) {
                             add('foo', spy);
                         }
@@ -646,7 +646,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                     var spy = sinon.spy();
                     var el = document.createElement('div');
-                    var Component = components.register(createComponentName(), {
+                    var Component = baustein.register(createComponentName(), {
                         setupEvents: function (add) {
                             add('foo', spy);
                         }
@@ -751,20 +751,20 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 it('should return a instance or undefined', function () {
 
-                    var Component1 = components.register(createComponentName());
+                    var Component1 = baustein.register(createComponentName());
 
                     var c1 = new Component1();
 
-                    expect(components.getInstanceOf(c1.name)).to.be.a('object');
-                    expect(components.getInstanceOf(c1.name)).to.be(c1);
-                    expect(components.getInstanceOf('hello')).to.be(undefined);
+                    expect(baustein.getInstanceOf(c1.name)).to.be.a('object');
+                    expect(baustein.getInstanceOf(c1.name)).to.be(c1);
+                    expect(baustein.getInstanceOf('hello')).to.be(undefined);
 
                 });
 
                 it('should return the right instance', function () {
 
-                    var Component1 = components.register(createComponentName());
-                    var Component2 = components.register(createComponentName());
+                    var Component1 = baustein.register(createComponentName());
+                    var Component2 = baustein.register(createComponentName());
 
                     var c1 = new Component1();
                     var c2 = new Component1();
@@ -772,8 +772,8 @@ define(['../../dist/components.amd.js'], function (components) {
                     var c4 = new Component2();
                     var c5 = new Component1();
 
-                    expect(components.getInstanceOf(c1.name)).to.be(c1);
-                    expect(components.getInstanceOf(c4.name)).to.be(c3);
+                    expect(baustein.getInstanceOf(c1.name)).to.be(c1);
+                    expect(baustein.getInstanceOf(c4.name)).to.be(c3);
 
                 });
 
@@ -783,8 +783,8 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 it('should destroy all instances', function () {
 
-                    var Component1 = components.register(createComponentName());
-                    var Component2 = components.register(createComponentName());
+                    var Component1 = baustein.register(createComponentName());
+                    var Component2 = baustein.register(createComponentName());
 
                     var c1 = new Component1();
                     var c2 = new Component1();
@@ -792,25 +792,25 @@ define(['../../dist/components.amd.js'], function (components) {
                     var c4 = new Component2();
                     var c5 = new Component1();
 
-                    components.destroy(c1.name);
+                    baustein.destroy(c1.name);
 
-                    expect(components.getInstancesOf(c1.name)).to.have.length(0);
-                    expect(components.getInstancesOf(c3.name)).to.have.length(2);
+                    expect(baustein.getInstancesOf(c1.name)).to.have.length(0);
+                    expect(baustein.getInstancesOf(c3.name)).to.have.length(2);
 
-                    components.destroy(c3.name);
+                    baustein.destroy(c3.name);
 
-                    expect(components.getInstancesOf(c1.name)).to.have.length(0);
-                    expect(components.getInstancesOf(c3.name)).to.have.length(0);
+                    expect(baustein.getInstancesOf(c1.name)).to.have.length(0);
+                    expect(baustein.getInstancesOf(c3.name)).to.have.length(0);
 
                 });
 
                 it('should fail silent if there are no instances', function () {
-                    expect(components.destroy).withArgs('hallo').to.not.throwException();
-                    expect(components.destroy).to.not.throwException();
+                    expect(baustein.destroy).withArgs('hallo').to.not.throwException();
+                    expect(baustein.destroy).to.not.throwException();
                 });
 
                 it('should be chainable', function () {
-                    expect(components.destroy()).to.be(components);
+                    expect(baustein.destroy()).to.be(baustein);
                 });
 
             });
@@ -819,7 +819,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 it('should add an entry to the _events array', function () {
 
-                    var Component1 = components.register(createComponentName());
+                    var Component1 = baustein.register(createComponentName());
 
                     var c = new Component1();
 
@@ -842,7 +842,7 @@ define(['../../dist/components.amd.js'], function (components) {
             describe('#releaseEvent(event, selector, handler)', function () {
 
                 it('given an event, selector and handler, remove the specific handler', function () {
-                    var NewComponent = components.register(createComponentName());
+                    var NewComponent = baustein.register(createComponentName());
                     var c = new NewComponent();
 
                     var handler = function () {
@@ -860,7 +860,7 @@ define(['../../dist/components.amd.js'], function (components) {
                 });
 
                 it('given an event, selector, remove all events for that selector', function () {
-                    var NewComponent = components.register(createComponentName());
+                    var NewComponent = baustein.register(createComponentName());
                     var c = new NewComponent();
 
                     var handler = function () {
@@ -877,7 +877,7 @@ define(['../../dist/components.amd.js'], function (components) {
                 });
 
                 it('given an event, remove all events from the component only', function () {
-                    var NewComponent = components.register(createComponentName());
+                    var NewComponent = baustein.register(createComponentName());
                     var c = new NewComponent();
 
                     var handler = function () {
@@ -899,7 +899,7 @@ define(['../../dist/components.amd.js'], function (components) {
                 });
 
                 it('should not remove unspecified events', function () {
-                    var NewComponent = components.register(createComponentName());
+                    var NewComponent = baustein.register(createComponentName());
                     var c = new NewComponent();
 
                     var handler = function () {
@@ -931,7 +931,7 @@ define(['../../dist/components.amd.js'], function (components) {
                 it('should call handlers registered with setGlobalHandler', function () {
 
                     var handler = sinon.spy();
-                    var Component = components.register(createComponentName());
+                    var Component = baustein.register(createComponentName());
                     var component1 = new Component();
                     var component2 = new Component();
 
@@ -940,7 +940,7 @@ define(['../../dist/components.amd.js'], function (components) {
                     component2.setGlobalHandler('foo', handler);
 
                     // handler should be called twice
-                    components.handleEvent({
+                    baustein.handleEvent({
                         type: 'foo',
                         target: document.body
                     });
@@ -950,7 +950,7 @@ define(['../../dist/components.amd.js'], function (components) {
                     component1.releaseGlobalHandler('foo', handler);
 
                     // one handler should still remain
-                    components.handleEvent({
+                    baustein.handleEvent({
                         type: 'foo',
                         target: document.body
                     });
@@ -964,25 +964,25 @@ define(['../../dist/components.amd.js'], function (components) {
         describe('components.register(name, implementation)', function () {
 
             it('should return a new class that extends components.Component', function () {
-                var NewComponent = components.register(createComponentName());
+                var NewComponent = baustein.register(createComponentName());
                 expect(new NewComponent()).to.be.a(Component);
             });
 
             it('should set the name of the component on the prototype', function () {
                 var name = createComponentName();
-                var NewComponent = components.register(name);
+                var NewComponent = baustein.register(name);
                 expect(new NewComponent()).to.have.property('name', name);
             });
 
             it('should throw an error if the name is already registered', function () {
                 var name = createComponentName();
-                components.register(name);
-                expect(components.register).withArgs(name).to.throwException();
+                baustein.register(name);
+                expect(baustein.register).withArgs(name).to.throwException();
             });
 
             it('should throw an error if name is not a valid string', function () {
-                expect(components.register).withArgs(null).to.throwException();
-                expect(components.register).withArgs('').to.throwException();
+                expect(baustein.register).withArgs(null).to.throwException();
+                expect(baustein.register).withArgs('').to.throwException();
             });
 
         });
@@ -990,25 +990,25 @@ define(['../../dist/components.amd.js'], function (components) {
         describe('components.register(implementation)', function () {
 
             it('should return a new class that extends components.Component', function () {
-                var NewComponent = components.register({name: createComponentName()});
+                var NewComponent = baustein.register({name: createComponentName()});
                 expect(new NewComponent()).to.be.a(Component);
             });
 
             it('should set the name of the component on the prototype', function () {
                 var name = createComponentName();
-                var NewComponent = components.register({name: name});
+                var NewComponent = baustein.register({name: name});
                 expect(new NewComponent()).to.have.property('name', name);
             });
 
             it('should throw an error if the name is already registered', function () {
                 var name = createComponentName();
-                components.register({name: name});
-                expect(components.register).withArgs({name: name}).to.throwException();
+                baustein.register({name: name});
+                expect(baustein.register).withArgs({name: name}).to.throwException();
             });
 
             it('should throw an error if name is not a valid string', function () {
-                expect(components.register).withArgs({}).to.throwException();
-                expect(components.register).withArgs({
+                expect(baustein.register).withArgs({}).to.throwException();
+                expect(baustein.register).withArgs({
                     name: function () {
                     }
                 }).to.throwException();
@@ -1026,19 +1026,19 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 var spy = sinon.spy();
 
-                components.register(name1, {
+                baustein.register(name1, {
                     setupEvents: function (add) {
                         add('click', this.onClick);
                     },
                     onClick: spy
                 });
-                components.register(name2, {
+                baustein.register(name2, {
                     setupEvents: function (add) {
                         add('click', '.outer', this.onOuterClick);
                     },
                     onOuterClick: spy
                 });
-                components.register(name3);
+                baustein.register(name3);
 
                 addTestHTML(
                     '<div id="first" is="' + name1 + '"></div>',
@@ -1050,28 +1050,28 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 var event = makeEvent('click', document.getElementById('first'));
 
-                components.handleEvent(event);
+                baustein.handleEvent(event);
 
                 expect(spy.callCount).to.equal(1);
                 expect(spy.getCall(0).args[0]).to.equal(event);
 
                 event = makeEvent('click', document.getElementById('span-inner'));
-                components.handleEvent(event);
+                baustein.handleEvent(event);
 
                 expect(spy.callCount).to.equal(2);
                 expect(spy.getCall(1).args[0]).to.equal(event);
                 expect(spy.getCall(1).args[1]).to.equal(event.target.parentElement);
 
                 event = makeEvent('click', document.getElementById('fifth'));
-                components.handleEvent(event);
+                baustein.handleEvent(event);
                 expect(spy.callCount).to.equal(2);
 
                 event = makeEvent('click', document.getElementById('second'));
-                components.handleEvent(event);
+                baustein.handleEvent(event);
                 expect(spy.callCount).to.equal(2);
 
                 event = makeEvent('touchstart', document.getElementById('second'));
-                components.handleEvent(event);
+                baustein.handleEvent(event);
                 expect(spy.callCount).to.equal(2);
             });
 
@@ -1080,7 +1080,7 @@ define(['../../dist/components.amd.js'], function (components) {
                 var name = createComponentName();
                 var spy = sinon.spy();
 
-                components.register(name, {
+                baustein.register(name, {
                     setupEvents: function (add) {
                         add('click', '.one.two [some-attribute]', this.onClick);
                     },
@@ -1095,7 +1095,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 var event = makeEvent('click', document.getElementById('target'));
 
-                components.handleEvent(event);
+                baustein.handleEvent(event);
 
                 expect(spy.callCount).to.equal(1);
             });
@@ -1105,7 +1105,7 @@ define(['../../dist/components.amd.js'], function (components) {
                 var name = createComponentName();
                 var handler = sinon.spy();
 
-                var C = components.register(name);
+                var C = baustein.register(name);
 
                 var el = document.createElement('div');
                 var c = new C();
@@ -1113,7 +1113,7 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 c.setGlobalHandler('click', handler);
 
-                components.handleEvent({
+                baustein.handleEvent({
                     type: 'click',
                     target: document.body
                 });
@@ -1134,32 +1134,32 @@ define(['../../dist/components.amd.js'], function (components) {
             });
 
             it('should create the correct component if it doesnt exist', function () {
-                components.register(name);
-                expect(components.fromElement(el)).to.be.a(Component);
+                baustein.register(name);
+                expect(baustein.fromElement(el)).to.be.a(Component);
             });
 
             it('should throw an exception if no component has been registered with the given name', function () {
-                expect(components.fromElement).withArgs(el).to.throwException();
+                expect(baustein.fromElement).withArgs(el).to.throwException();
             });
 
             it('should always return the same component instance', function () {
-                components.register(name);
-                var c = components.fromElement(el);
-                expect(components.fromElement(el)).to.equal(c);
-                expect(components.fromElement(el)).to.equal(c);
-                expect(components.fromElement(el)).to.equal(c);
+                baustein.register(name);
+                var c = baustein.fromElement(el);
+                expect(baustein.fromElement(el)).to.equal(c);
+                expect(baustein.fromElement(el)).to.equal(c);
+                expect(baustein.fromElement(el)).to.equal(c);
             });
 
             it('should return null if the element has no component name attribute', function () {
-                expect(components.fromElement(document.createElement('div'))).to.equal(null);
+                expect(baustein.fromElement(document.createElement('div'))).to.equal(null);
             });
 
             it('should return null if the passed argument is not an element', function () {
-                expect(components.fromElement(null)).to.equal(null);
-                expect(components.fromElement({})).to.equal(null);
-                expect(components.fromElement(function () {
+                expect(baustein.fromElement(null)).to.equal(null);
+                expect(baustein.fromElement({})).to.equal(null);
+                expect(baustein.fromElement(function () {
                 })).to.equal(null);
-                expect(components.fromElement('<div></div>')).to.equal(null);
+                expect(baustein.fromElement('<div></div>')).to.equal(null);
             });
 
         });

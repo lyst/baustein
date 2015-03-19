@@ -50,10 +50,10 @@
     </form>
 </script>
 
-<script src="../../../dist/components.globals.js"></script>
+<script src="../../../dist/baustein.globals.js"></script>
 <script>
 
-    components.register('todos-app', {
+    baustein.register('todos-app', {
 
         template: document.getElementById('todos-app-template').innerHTML,
 
@@ -140,7 +140,7 @@
 
     });
 
-    components.register('todos-form', {
+    baustein.register('todos-form', {
 
         template: document.getElementById('todos-form-template').innerHTML,
 
@@ -166,7 +166,7 @@
 
     });
 
-    components.register('todos-footer', {
+    baustein.register('todos-footer', {
 
         template: document.getElementById('todos-footer-template').innerHTML,
 
@@ -198,7 +198,7 @@
 
     });
 
-    var ToDoItem = components.register('todo-item', {
+    var ToDoItem = baustein.register('todo-item', {
 
         tagName: 'li',
 
@@ -271,7 +271,7 @@
 
     });
 
-    components.init();
+    baustein.init();
 
 </script>
 </body>
