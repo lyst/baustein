@@ -8,6 +8,7 @@ var doc = win.document;
 var slice = [].slice;
 var filter = [].filter;
 var map = [].map;
+var observer;
 
 /**
  * The current function to use to query elements in the DOM. Can be overridden when calling `init`.
@@ -566,10 +567,46 @@ function eventManager(method) {
 }
 
 /**
+ * Handler for mutation events. Only used when MutationObserver is not supported.
+ * @param event
+ */
+function mutationEventHandler(event) {
+    switch (event.type) {
+        case 'DOMNodeInserted':
+            nodeInserted(event.target);
+            break;
+        case 'DOMNodeRemoved':
+            nodeRemoved(event.target);
+            break;
+    }
+}
+
+/**
  * Binds all events.
  */
 function bindEvents() {
     eventManager('addEventListener');
+
+    // use MutationObserver if available
+    if (window.MutationObserver) {
+        observer = new MutationObserver(function (records) {
+            slice.call(records).forEach(function (record) {
+                slice.call(record.removedNodes).forEach(nodeRemoved);
+                slice.call(record.addedNodes).forEach(nodeInserted);
+            });
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+
+    // fallback to mutation events
+    else {
+        document.body.addEventListener('DOMNodeInserted', mutationEventHandler, true);
+        document.body.addEventListener('DOMNodeRemoved', mutationEventHandler, true);
+    }
 }
 
 exports.bindEvents = bindEvents;
@@ -578,9 +615,36 @@ exports.bindEvents = bindEvents;
  */
 function unbindEvents() {
     eventManager('removeEventListener');
+
+    if (observer) {
+        observer.disconnect();
+    } else {
+        document.body.removeEventListener('DOMNodeInserted', mutationEventHandler, true);
+        document.body.removeEventListener('DOMNodeRemoved', mutationEventHandler, true);
+    }
 }
 
 exports.unbindEvents = unbindEvents;
+/**
+ * Handler for a node being inserted. Parses the node finding all components and
+ * calls `onInsert` on each.
+ * @param node
+ */
+function nodeInserted(node) {
+    invoke(parse(node), 'onInsert');
+    invoke(parse(node), 'emit', 'inserted');
+}
+
+/**
+ * Handler for a node being removed. Parses the node finding all components and
+ * calls `onRemove` on each.
+ * @param node
+ */
+function nodeRemoved(node) {
+    invoke(parse(node), 'onRemove');
+    invoke(parse(node), 'emit', 'remove');
+}
+
 /**
  * Initialises the components library by parsing the DOM and binding events.
  * @param {object} [options]
@@ -762,18 +826,8 @@ Component.prototype = {
 
         if (templateIsFunction || templateIsString) {
             this.el.innerHTML = templateIsFunction ? template.call(this, this) : template;
-            this.parse();
         }
 
-        return this;
-    },
-
-    /**
-     * Parses this Component and instantiates any child components
-     * @returns {Component}
-     */
-    parse: function () {
-        parse(this.el);
         return this;
     },
 
@@ -808,7 +862,6 @@ Component.prototype = {
 
         var parent = el.parentElement;
         if (parent) {
-            this.beforeInsert();
             parent.insertBefore(this.el, el);
             this.onInsert();
             this.emit('inserted');
@@ -834,7 +887,6 @@ Component.prototype = {
         // null case automatically handled
         var parent = el.parentNode;
         if (parent) {
-            this.beforeInsert();
             parent.insertBefore(this.el, el.nextSibling);
             this.onInsert();
             this.emit('inserted');
@@ -856,17 +908,11 @@ Component.prototype = {
             return this;
         }
 
-        this.beforeInsert();
         el.appendChild(this.el);
         this.onInsert();
         this.emit('inserted');
         return this;
     },
-
-    /**
-     * Called before the Component in inserted into the DOM.
-     */
-    beforeInsert: noop,
 
     /**
      * Called after the Component is inserted into the DOM.
@@ -887,9 +933,8 @@ Component.prototype = {
         // get the chain of parent components if not passed
         chain = chain || parentComponents(this.el, true);
 
-        // get all the child Components and invoke beforeRemove
+        // get all the child Components
         var children = parse(this.el);
-        invoke(children, 'beforeRemove');
 
         // actually remove the element
         this.el.parentElement.removeChild(this.el);
@@ -899,11 +944,6 @@ Component.prototype = {
         this.emit('remove', null, chain);
         return this;
     },
-
-    /**
-     * Called before this Component is removed from the DOM.
-     */
-    beforeRemove: noop,
 
     /**
      * Called after this Component is removed from the DOM.
