@@ -1,20 +1,16 @@
 {
-  "name": "components",
-  "version": "0.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "baustein",
+  "version": "0.0.1",
   "scripts": {
     "test": "grunt build && grunt test"
   },
   "engines": {
     "node": ">=0.10.0"
   },
-  "author": {
-    "name": "Jon Bretman"
-  },
+  "author": "Lyst <devs@lyst.com>",
   "repository": {
     "type": "git",
-    "url": "git://github.com/jonbretman/components.git"
+    "url": "git://github.com/ssaw/baustein.git"
   },
   "license": "ISC",
   "devDependencies": {
