@@ -61,10 +61,10 @@
 </script>
 
 
-<script src="../../../dist/components.globals.js"></script>
+<script src="../../../dist/baustein.globals.js"></script>
 <script>
 
-    components.register('my-app', {
+    baustein.register('my-app', {
 
         setupEvents: function (add) {
             add('open-overlay', 'my-button', this.openOverlay);
@@ -79,7 +79,7 @@
 
     });
 
-    components.register('my-button', {
+    baustein.register('my-button', {
 
         setupEvents: function (add) {
             add('click', this.onClick);
@@ -93,7 +93,7 @@
 
     });
 
-    var MyOverlay = components.register('my-overlay', {
+    var MyOverlay = baustein.register('my-overlay', {
 
         template: function () {
             var template = document.getElementById('my-overlay-template').innerHTML;
@@ -127,7 +127,7 @@
 
     });
 
-    components.init();
+    baustein.init();
 
 </script>
 </body>
