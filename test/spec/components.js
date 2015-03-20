@@ -215,9 +215,8 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 beforeEach(function () {
                     name = createComponentName();
-                    addTestHTML('<div id="el" is="' + name + '"></div>');
                     components.register(name);
-                    components.parse();
+                    addTestHTML('<div id="el" is="' + name + '"></div>');
                     c = components.fromElement(document.getElementById('el'));
                 });
 
@@ -233,20 +232,6 @@ define(['../../dist/components.amd.js'], function (components) {
                 it('should handle the element having no parent', function () {
                     document.getElementById('el').parentElement.removeChild(document.getElementById('el'));
                     expect(c.remove()).to.be.ok();
-                });
-
-                it('should call beforeRemove() before removing element from parent', function () {
-                    var el = document.createElement('div');
-                    var def = {
-                        beforeRemove: sinon.spy(function () {
-                            expect(this.el.parentElement).to.equal(el);
-                        })
-                    };
-                    var C = components.register(createComponentName(), def);
-                    var c = new C();
-                    c.appendTo(el);
-                    c.remove();
-                    expect(c.beforeRemove.callCount).to.equal(1);
                 });
 
                 it('should call onRemove() after removing element from parent', function () {
@@ -309,9 +294,8 @@ define(['../../dist/components.amd.js'], function (components) {
 
                 it('should remove the element, destroy the component instance, and return null', function () {
                     var name = createComponentName();
-                    addTestHTML('<div id="test-el" is="' + name + '"></div>');
                     components.register(name);
-                    components.parse();
+                    addTestHTML('<div id="test-el" is="' + name + '"></div>');
                     var c = components.fromElement(document.getElementById('test-el'));
                     expect(c.destroy()).to.equal(null);
                     expect(document.getElementById('test-el')).to.equal(null);
@@ -1040,16 +1024,7 @@ define(['../../dist/components.amd.js'], function (components) {
                 var name2 = createComponentName();
                 var name3 = createComponentName();
 
-                addTestHTML(
-                    '<div id="first" is="' + name1 + '"></div>',
-                    '<div id="second" is="' + name2 + '"><span class="outer"><span id="span-inner" class="inner"></span></span></div>',
-                    '<div id="third" is="' + name1 + '"></div>',
-                    '<div id="fourth" is="' + name3 + '"></div>',
-                    '<div id="fifth"></div>'
-                );
-
                 var spy = sinon.spy();
-                var event = makeEvent('click', document.getElementById('first'));
 
                 components.register(name1, {
                     setupEvents: function (add) {
@@ -1065,7 +1040,16 @@ define(['../../dist/components.amd.js'], function (components) {
                 });
                 components.register(name3);
 
-                components.parse();
+                addTestHTML(
+                    '<div id="first" is="' + name1 + '"></div>',
+                    '<div id="second" is="' + name2 + '"><span class="outer"><span id="span-inner" class="inner"></span></span></div>',
+                    '<div id="third" is="' + name1 + '"></div>',
+                    '<div id="fourth" is="' + name3 + '"></div>',
+                    '<div id="fifth"></div>'
+                );
+
+                var event = makeEvent('click', document.getElementById('first'));
+
                 components.handleEvent(event);
 
                 expect(spy.callCount).to.equal(1);
@@ -1094,15 +1078,7 @@ define(['../../dist/components.amd.js'], function (components) {
             it('should handle complicated selectors', function () {
 
                 var name = createComponentName();
-
-                addTestHTML(
-                    '<div is="' + name + '">',
-                    '  <span class="one two"><span><span some-attribute><span id="target"></span></span></span></span>',
-                    '</div>'
-                );
-
                 var spy = sinon.spy();
-                var event = makeEvent('click', document.getElementById('target'));
 
                 components.register(name, {
                     setupEvents: function (add) {
@@ -1111,7 +1087,14 @@ define(['../../dist/components.amd.js'], function (components) {
                     onClick: spy
                 });
 
-                components.parse();
+                addTestHTML(
+                    '<div is="' + name + '">',
+                    '  <span class="one two"><span><span some-attribute><span id="target"></span></span></span></span>',
+                    '</div>'
+                );
+
+                var event = makeEvent('click', document.getElementById('target'));
+
                 components.handleEvent(event);
 
                 expect(spy.callCount).to.equal(1);
