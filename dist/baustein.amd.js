@@ -634,8 +634,9 @@ define(
      * @param node
      */
     function nodeInserted(node) {
-        invoke(parse(node), 'onInsert');
-        invoke(parse(node), 'emit', 'inserted');
+        var components = parse(node);
+        invoke(components, 'onInsert');
+        invoke(components, 'emit', 'inserted');
     }
 
     /**
@@ -645,7 +646,6 @@ define(
      */
     function nodeRemoved(node) {
         invoke(parse(node), 'onRemove');
-        invoke(parse(node), 'emit', 'remove');
     }
 
     /**
@@ -667,7 +667,10 @@ define(
             domWrapper = options.domWrapper;
         }
 
-        parse();
+        // by calling `nodeInserted` not only will all the components present at page load be parsed
+        // but `onInsert` will be called and the "inserted" event will be emitted on each
+        nodeInserted(doc.body);
+
         bindEvents();
     }
 
@@ -866,8 +869,6 @@ define(
             var parent = el.parentElement;
             if (parent) {
                 parent.insertBefore(this.el, el);
-                this.onInsert();
-                this.emit('inserted');
             }
 
             return this;
@@ -891,8 +892,6 @@ define(
             var parent = el.parentNode;
             if (parent) {
                 parent.insertBefore(this.el, el.nextSibling);
-                this.onInsert();
-                this.emit('inserted');
             }
 
             return this;
@@ -912,8 +911,6 @@ define(
             }
 
             el.appendChild(this.el);
-            this.onInsert();
-            this.emit('inserted');
             return this;
         },
 
@@ -942,9 +939,6 @@ define(
             // actually remove the element
             this.el.parentElement.removeChild(this.el);
 
-            // invoke onRemove and emit remove event
-            invoke(children, 'onRemove');
-            this.emit('remove', null, chain);
             return this;
         },
 
