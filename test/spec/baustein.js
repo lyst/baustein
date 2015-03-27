@@ -234,60 +234,6 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     expect(c.remove()).to.be.ok();
                 });
 
-                it('should call onRemove() after removing element from parent', function () {
-                    var el = document.createElement('div');
-                    var def = {
-                        onRemove: sinon.spy(function () {
-                            expect(this.el.parentElement).to.equal(null);
-                        })
-                    };
-                    var C = baustein.register(createComponentName(), def);
-                    var c = new C();
-                    c.appendTo(el);
-                    c.remove();
-                    expect(c.onRemove.callCount).to.equal(1);
-                });
-
-                it('should emit the "remove" event', function () {
-
-                    var C = baustein.register(createComponentName());
-
-                    var def = {
-                        setupEvents: function (add) {
-                            add('remove', C.prototype.name, this.removeEventHandler);
-                        },
-                        removeEventHandler: sinon.spy()
-                    };
-
-                    // this is a component that is listening for the
-                    // 'destroy' event from the C component
-                    var C2 = baustein.register(createComponentName(), def);
-
-                    // set up component hierarchy
-                    var c1 = new C2();
-                    var c2 = new C2();
-                    var c3 = new C2();
-                    var c4 = new C();
-                    c3.el.appendChild(c4.el);
-                    c2.el.appendChild(c3.el);
-                    c1.el.appendChild(c2.el);
-
-                    // assert the handler has not been called
-                    expect(def.removeEventHandler.callCount).to.equal(0);
-
-                    // destroy the inner most child element
-                    c4.remove();
-
-                    // assert handler was called correct number of times
-                    expect(def.removeEventHandler.callCount).to.equal(3);
-
-                    // check event bubbled up the dom firing on components in the correct order
-                    [c3, c2, c1].forEach(function (c, i) {
-                        expect(def.removeEventHandler.getCall(i).calledOn(c)).to.be.ok();
-                    });
-
-                });
-
             });
 
             describe('#destroy()', function () {
@@ -955,6 +901,113 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                         target: document.body
                     });
                     expect(handler.callCount).to.equal(3);
+                });
+
+            });
+
+            describe('#onInsert', function () {
+
+                it('should be called when the component is inserted into the DOM', function (done) {
+
+                    var name = createComponentName();
+                    var spy = sinon.spy();
+                    var C = baustein.register(name, {
+                        onInsert: spy
+                    });
+
+                    // create the DOM structure:
+                    //     <parent>
+                    //         <c1>
+                    //             <c2>
+                    var parent = document.createElement('div');
+                    var c1 = new C();
+                    var c2 = new C();
+                    c1.appendTo(parent);
+                    c2.appendTo(c1);
+
+                    // add the parent which should trigger onInsert to be called
+                    document.body.appendChild(parent);
+
+                    // MutationObserver and mutation events are asynchronous so have to use a
+                    // setTimeout, 100ms should be more than enough.
+                    setTimeout(function () {
+                        expect(spy.callCount).to.equal(2);
+                        expect(spy.getCall(0).thisValue).to.equal(c1);
+                        expect(spy.getCall(1).thisValue).to.equal(c2);
+                        done();
+                    }, 100);
+                });
+
+            });
+
+            describe('#onRemove', function () {
+
+                it('should be called when the component is removed from the DOM', function (done) {
+
+                    var name = createComponentName();
+                    var spy = sinon.spy();
+                    var C = baustein.register(name, {
+                        onRemove: spy
+                    });
+
+                    // create the DOM structure:
+                    // <body>
+                    //     <parent>
+                    //         <c1>
+                    //             <c2>
+                    var parent = document.createElement('div');
+                    var c1 = new C();
+                    var c2 = new C();
+                    document.body.appendChild(parent);
+                    c1.appendTo(parent);
+                    c2.appendTo(c1);
+
+                    document.body.removeChild(parent);
+
+                    // MutationObserver and mutation events are asynchronous so have to use a
+                    // setTimeout, 100ms should be more than enough.
+                    setTimeout(function () {
+                        expect(spy.callCount).to.equal(2);
+                        expect(spy.getCall(0).thisValue).to.equal(c1);
+                        expect(spy.getCall(1).thisValue).to.equal(c2);
+                        done();
+                    }, 100);
+                });
+
+            });
+
+            describe('the "inserted" event', function () {
+
+                it('should be emitted when a component is inserted', function (done) {
+
+                    var parentName = createComponentName();
+                    var childName = createComponentName();
+                    var spy = sinon.spy();
+
+                    var Parent = baustein.register(parentName, {
+                        setupEvents: function (add) {
+                            add('inserted', childName, spy);
+                        }
+                    });
+                    var Child = baustein.register(childName);
+
+                    var parent = new Parent();
+                    var child = new Child();
+
+                    parent.appendTo(document.body);
+
+                    expect(spy.callCount).to.equal(0);
+
+                    child.appendTo(parent);
+
+                    // MutationObserver and mutation events are asynchronous so have to use a
+                    // setTimeout, 100ms should be more than enough.
+                    setTimeout(function () {
+                        expect(spy.callCount).to.equal(1);
+                        expect(spy.getCall(0).args[0]).to.have.property('target', child);
+                        done();
+                    }, 100);
+
                 });
 
             });
