@@ -1057,6 +1057,33 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                 expect(c.foo).to.equal(1);
             });
 
+            it('should setup mixins correctly', function () {
+                var myMethod = sinon.spy();
+
+                var myMixin = {
+                    setupEvents: sinon.spy()
+                };
+                var myOtherMixin = {
+                    setupEvents: sinon.spy()
+                };
+
+                var C = baustein.register(createComponentName(), {
+                    mixins: [myMixin, myOtherMixin],
+                    setupEvents: myMethod
+                });
+
+                new C();
+
+                // each method should have been called once
+                expect(myMixin.setupEvents.callCount).to.equal(1);
+                expect(myOtherMixin.setupEvents.callCount).to.equal(1);
+                expect(myMethod.callCount).to.equal(1);
+
+                // check they were called in the correct order
+                expect(myMixin.setupEvents.calledBefore(myOtherMixin.setupEvents)).to.equal(true);
+                expect(myOtherMixin.setupEvents.calledBefore(myMethod)).to.equal(true);
+            });
+
         });
 
         describe('baustein.handleEvent(event)', function () {

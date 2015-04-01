@@ -502,8 +502,6 @@ export function parse(root) {
  */
 export function register(name, impl) {
 
-    var F, Surrogate;
-
     if (!isString(name) || !name) {
         throw Error('"' + name + '" is not a valid component name');
     }
@@ -514,19 +512,39 @@ export function register(name, impl) {
 
     impl = impl || {};
 
-    F = function () {
+    function F() {
         Component.apply(this, arguments);
-    };
+    }
 
-    Surrogate = function () {};
-    Surrogate.prototype = Component.prototype;
-    F.prototype = new Surrogate();
+    F.prototype = Object.create(Component.prototype);
     F.prototype.name = name;
 
-    // copy all property descriptors
-    Object.keys(impl).forEach(function (key) {
-        var descriptor = Object.getOwnPropertyDescriptor(impl, key);
-        Object.defineProperty(F.prototype, key, descriptor);
+    var impls = slice.call(impl.mixins || []);
+    impls.push(impl);
+
+    impls.forEach(function (impl) {
+        Object.keys(impl).forEach(function (key) {
+
+            var descriptor = Object.getOwnPropertyDescriptor(impl, key);
+            var existing = Object.getOwnPropertyDescriptor(F.prototype, key);
+
+            if (isFunction(descriptor.value) && existing && isFunction(existing.value)) {
+
+                // save the original method
+                var method = descriptor.value;
+
+                // override the value of the descriptor to call
+                // both the original function and the new one
+                descriptor.value = function () {
+                    existing.value.apply(this, arguments);
+                    return method.apply(this, arguments);
+                };
+            }
+
+            // define the new property
+            Object.defineProperty(F.prototype, key, descriptor);
+        });
+
     });
 
     componentClasses[name] = F;
