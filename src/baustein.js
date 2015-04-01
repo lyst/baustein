@@ -496,18 +496,13 @@ export function parse(root) {
 
 /**
  * Registers a new Component.
- * @param {String|Object} name
+ * @param {String} name
  * @param {Object} [impl] The implementation methods / properties.
  * @returns {Function}
  */
 export function register(name, impl) {
 
     var F, Surrogate;
-
-    if (isObject(name)) {
-        impl = name;
-        name = impl.name;
-    }
 
     if (!isString(name) || !name) {
         throw Error('"' + name + '" is not a valid component name');
@@ -528,7 +523,11 @@ export function register(name, impl) {
     F.prototype = new Surrogate();
     F.prototype.name = name;
 
-    extend(F.prototype, impl);
+    // copy all property descriptors
+    Object.keys(impl).forEach(function (key) {
+        var descriptor = Object.getOwnPropertyDescriptor(impl, key);
+        Object.defineProperty(F.prototype, key, descriptor);
+    });
 
     componentClasses[name] = F;
     return F;
