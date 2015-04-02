@@ -467,19 +467,26 @@ export function handleEvent(event, componentsChain) {
 
 /**
  * Parses the given element or the root element and creates Component instances.
- * @param {HTMLElement} [root]
+ * @param {HTMLElement} [node]
  * @returns {Component[]}
  */
-export function parse(root) {
+export function parse(node) {
+
+    if (arguments.length === 0) {
+        node = doc.body;
+    }
+    else if (!isElement(node)) {
+        throw new Error('node must be an HTMLElement');
+    }
 
     // allow DOM element or nothing
-    root = isElement(root) ? root : doc.body;
+    node = isElement(node) ? node : doc.body;
 
-    var els = slice.call(root.querySelectorAll('[is]'));
+    var els = slice.call(node.querySelectorAll('[is]'));
     var component;
 
     // add the root element to the front
-    els.unshift(root);
+    els.unshift(node);
 
     return els.reduce(function (result, el) {
 
@@ -622,9 +629,11 @@ export function unbindEvents() {
  * @param node
  */
 function nodeInserted(node) {
-    var components = parse(node);
-    invoke(components, 'onInsert');
-    invoke(components, 'emit', 'inserted');
+    if (isElement(node)) {
+        var components = parse(node);
+        invoke(components, 'onInsert');
+        invoke(components, 'emit', 'inserted');
+    }
 }
 
 /**
@@ -633,7 +642,9 @@ function nodeInserted(node) {
  * @param node
  */
 function nodeRemoved(node) {
-    invoke(parse(node), 'onRemove');
+    if (isElement(node)) {
+        invoke(parse(node), 'onRemove');
+    }
 }
 
 /**

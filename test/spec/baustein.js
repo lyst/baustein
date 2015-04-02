@@ -1217,6 +1217,16 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
         });
 
+        describe('baustein.parse()', function () {
+
+            it('should throw an error if the passed argument is not an element', function () {
+                expect(baustein.parse).withArgs(null).to.throwException();
+                expect(baustein.parse).withArgs(document.createTextNode('hello')).to.throwException();
+                expect(baustein.parse).withArgs({}).to.throwException();
+            });
+
+        });
+
     });
 
 });
