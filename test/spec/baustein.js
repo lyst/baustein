@@ -24,7 +24,7 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
         };
     }
 
-    describe('components', function () {
+    describe('baustein', function () {
 
         var Component = baustein.Component;
         var testRoot = document.createElement('div');
@@ -58,7 +58,7 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
             };
         };
 
-        describe('components.Component', function () {
+        describe('baustein.Component', function () {
 
             it('should be a function', function () {
                 expect(baustein.Component).to.be.a('function');
@@ -1014,9 +1014,9 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
         });
 
-        describe('components.register(name, implementation)', function () {
+        describe('baustein.register(name, implementation)', function () {
 
-            it('should return a new class that extends components.Component', function () {
+            it('should return a new class that extends baustein.Component', function () {
                 var NewComponent = baustein.register(createComponentName());
                 expect(new NewComponent()).to.be.a(Component);
             });
@@ -1038,38 +1038,28 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                 expect(baustein.register).withArgs('').to.throwException();
             });
 
-        });
-
-        describe('components.register(implementation)', function () {
-
-            it('should return a new class that extends components.Component', function () {
-                var NewComponent = baustein.register({name: createComponentName()});
-                expect(new NewComponent()).to.be.a(Component);
-            });
-
-            it('should set the name of the component on the prototype', function () {
-                var name = createComponentName();
-                var NewComponent = baustein.register({name: name});
-                expect(new NewComponent()).to.have.property('name', name);
-            });
-
-            it('should throw an error if the name is already registered', function () {
-                var name = createComponentName();
-                baustein.register({name: name});
-                expect(baustein.register).withArgs({name: name}).to.throwException();
-            });
-
-            it('should throw an error if name is not a valid string', function () {
-                expect(baustein.register).withArgs({}).to.throwException();
-                expect(baustein.register).withArgs({
-                    name: function () {
+            it('should support getters and setters', function () {
+                var NewComponent = baustein.register(createComponentName(), {
+                    counter: 0,
+                    get foo() {
+                        this.counter += 1;
+                        return this.counter;
                     }
-                }).to.throwException();
+                });
+
+                var c = new NewComponent();
+                expect(c.foo).to.equal(1);
+                expect(c.foo).to.equal(2);
+                expect(c.foo).to.equal(3);
+
+                // check each instance is unique
+                c = new NewComponent();
+                expect(c.foo).to.equal(1);
             });
 
         });
 
-        describe('components.handleEvent(event)', function () {
+        describe('baustein.handleEvent(event)', function () {
 
             it('should invoke the correct method on the correct component', function () {
 
@@ -1176,7 +1166,7 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
         });
 
-        describe('components.fromElement(element)', function () {
+        describe('baustein.fromElement(element)', function () {
 
             var name, el;
 
