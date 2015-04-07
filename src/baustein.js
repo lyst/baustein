@@ -40,6 +40,19 @@ var componentInstances = {};
 var globalHandlers = {};
 
 /**
+ * If `handleEvent` is called while already handing an event then the arguments will be pushed
+ * into this array and then handled after the current event has been handled.
+ * @type {Array}
+ */
+var pendingEvents = [];
+
+/**
+ * Flag indicating whether an event is currently being handled.
+ * @type {boolean}
+ */
+var handlingEvent = false;
+
+/**
  * Incrementing number used to give each component a unique id.
  * @type {Number}
  */
@@ -351,6 +364,21 @@ export function isComponent(component) {
     return component instanceof Component;
 }
 
+function ensureEventHasMethod(event, method, property) {
+    var originalMethod = event[method];
+
+    if (typeof event[property] === 'undefined') {
+        event[property] = false;
+    }
+
+    event[method] = function () {
+        event[property] = true;
+        if (originalMethod) {
+            return originalMethod.apply(event, arguments);
+        }
+    };
+}
+
 /**
  * Handles all events - both standard DOM events and custom Component events.
  *
@@ -365,6 +393,16 @@ export function isComponent(component) {
  *                                        Components is already available.
  */
 export function handleEvent(event, componentsChain) {
+
+    if (handlingEvent) {
+        pendingEvents.push(arguments);
+        return;
+    }
+
+    handlingEvent = true;
+
+    ensureEventHasMethod(event, 'stopPropagation', 'propagationStopped');
+    ensureEventHasMethod(event, 'preventDefault', 'defaultPrevented');
 
     // this will be a DOM element or a Component
     // component event objects are created in Component.prototype.emit
@@ -397,6 +435,10 @@ export function handleEvent(event, componentsChain) {
     }
 
     for (i = 0, length = componentsChain.length; i < length; i++) {
+
+        if (event.propagationStopped) {
+            break;
+        }
 
         component = componentsChain[i];
         events = component._events;
@@ -449,19 +491,27 @@ export function handleEvent(event, componentsChain) {
 
     }
 
-    // Now all component events have been handled we need to handler 'global'
-    // events that have been subscribed to using 'setGlobalHandler'.
-    // This is supported for components that need to listen to events on the body/document/window.
-    handlers = globalHandlers[eventName];
+    if (!event.propagationStopped) {
+        // Now all component events have been handled we need to handle 'global'
+        // events that have been subscribed to using 'setGlobalHandler'.
+        // This is supported for components that need to listen to events on the body/document/window.
+        handlers = globalHandlers[eventName];
 
-    // if there are no handlers we are done
-    if (!handlers) {
-        return;
+        // call the global handlers
+        if (handlers) {
+            for (i = 0, length = handlers.length; i < length; i++) {
+                handlers[i].fn.call(handlers[i].ctx, event, doc.body);
+            }
+        }
     }
 
-    // call the global handlers
-    for (i = 0, length = handlers.length; i < length; i++) {
-        handlers[i].fn.call(handlers[i].ctx, event, doc.body);
+    // we are no longer handling this event
+    handlingEvent = false;
+
+    // if there are pending events handle the next one
+    if (pendingEvents.length) {
+        var args = pendingEvents.shift();
+        handleEvent.apply(null, args);
     }
 }
 
@@ -861,6 +911,7 @@ Component.prototype = {
         data.customEvent = true;
 
         handleEvent(data, chain);
+        return data;
     },
 
     /**

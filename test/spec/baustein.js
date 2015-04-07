@@ -610,6 +610,72 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
                 });
 
+                it('should handle one event at a time', function () {
+                    var spy = sinon.spy(function () {
+                        if (this.options.child) {
+                            this.emit('bar');
+                        }
+                    });
+
+                    var Component = baustein.register(createComponentName(), {
+                        setupEvents: function (add) {
+                            add('foo', spy);
+                            if (this.options.grandparent) {
+                                add('bar', spy);
+                            }
+                        }
+                    });
+
+                    var parent = new Component({grandparent: true});
+                    var child = new Component({child: true});
+                    var grandchild = new Component();
+
+                    child.appendTo(parent);
+                    grandchild.appendTo(child);
+
+                    grandchild.emit('foo');
+
+                    // check the number of calls
+                    expect(spy.callCount).to.equal(4);
+
+                    // first 'foo' should have been handled
+                    expect(spy.getCall(0).thisValue).to.equal(grandchild);
+                    expect(spy.getCall(1).thisValue).to.equal(child);
+                    expect(spy.getCall(2).thisValue).to.equal(parent);
+                    expect(spy.getCall(2).args[0]).to.have.property('type', 'foo');
+
+                    // then 'bar'
+                    expect(spy.getCall(3).thisValue).to.equal(parent);
+                    expect(spy.getCall(3).args[0]).to.have.property('type', 'bar');
+                });
+
+                it('should stop handling the event if stopPropagation() is called', function () {
+                    var spy = sinon.spy(function (event) {
+                        if (this.options.callStopPropagation) {
+                            event.stopPropagation();
+                        }
+                    });
+
+                    var Component = baustein.register(createComponentName(), {
+                        setupEvents: function (add) {
+                            add('foo', spy);
+                        }
+                    });
+
+                    var parent = new Component();
+                    var child = new Component({callStopPropagation: true});
+                    var grandchild = new Component();
+
+                    child.appendTo(parent);
+                    grandchild.appendTo(child);
+
+                    grandchild.emit('foo');
+
+                    expect(spy.callCount).to.equal(2);
+                    expect(spy.getCall(0).thisValue).to.equal(grandchild);
+                    expect(spy.getCall(1).thisValue).to.equal(child);
+                });
+
             });
 
             describe('#insertBefore(element)', function () {
