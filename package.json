@@ -1,9 +1,9 @@
 {
   "name": "baustein",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "scripts": {
     "test": "grunt build && grunt test",
-    "postinstall" : "grunt build"
+    "postinstall": "grunt build"
   },
   "engines": {
     "node": ">=0.10.0"
