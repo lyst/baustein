@@ -29,6 +29,6 @@
     "karma-requirejs": "^0.2.2",
     "karma-sinon": "^1.0.4",
     "load-grunt-tasks": "^2.0.0",
-    "requirejs": "^2.1.16"
+    "requirejs": "^2.1.17"
   }
 }

@@ -50,228 +50,231 @@
     </form>
 </script>
 
-<script src="../../../dist/baustein.globals.js"></script>
+<script src="../../../node_modules/requirejs/require.js"></script>
 <script>
 
-    baustein.register('todos-app', {
+    require(["../../../dist/baustein.amd.js"], function (baustein) {
 
-        template: document.getElementById('todos-app-template').innerHTML,
+        baustein.register('todos-app', {
 
-        setupEvents: function (add) {
-            add('new-todo', 'todos-form', this.onNewTodoSave);
-            add('clear-completed', 'todos-footer', this.onClearCompleted);
-            add('filter-selected', 'todos-footer', this.onFilterSelected);
-            add('destroy', 'todo-item', this.updateCounts);
-            add('status-change', 'todo-item', this.updateCounts);
-            add('change', '#toggle-all', this.onToggleAll);
-        },
+            template: document.getElementById('todos-app-template').innerHTML,
 
-        onNewTodoSave: function (event) {
+            setupEvents: function (add) {
+                add('new-todo', 'todos-form', this.onNewTodoSave);
+                add('clear-completed', 'todos-footer', this.onClearCompleted);
+                add('filter-selected', 'todos-footer', this.onFilterSelected);
+                add('destroy', 'todo-item', this.updateCounts);
+                add('status-change', 'todo-item', this.updateCounts);
+                add('change', '#toggle-all', this.onToggleAll);
+            },
 
-            var todoItem = new ToDoItem({
-                title: event.title
-            });
+            onNewTodoSave: function (event) {
 
-            todoItem.appendTo(this.find('#todo-list')[0]);
-            this.updateCounts();
-        },
+                var todoItem = new ToDoItem({
+                    title: event.title
+                });
 
-        onToggleAll: function (event, input) {
-            this.invoke(
-                this.findComponents('todo-item'),
-                input.checked ? 'select' : 'deselect'
-            );
-        },
+                todoItem.appendTo(this.find('#todo-list')[0]);
+                this.updateCounts();
+            },
 
-        onClearCompleted: function () {
-            this.findComponents('todo-item').forEach(function (todoItem) {
-                if (todoItem.isComplete()) {
-                    todoItem.destroy();
+            onToggleAll: function (event, input) {
+                this.invoke(
+                        this.findComponents('todo-item'),
+                        input.checked ? 'select' : 'deselect'
+                );
+            },
+
+            onClearCompleted: function () {
+                this.findComponents('todo-item').forEach(function (todoItem) {
+                    if (todoItem.isComplete()) {
+                        todoItem.destroy();
+                    }
+                });
+            },
+
+            onFilterSelected: function (event) {
+                var filter = event.filter;
+                var main = this.find('#main')[0];
+
+                ['all', 'completed', 'active'].forEach(function (f) {
+                    main.classList[f === filter ? 'add' : 'remove'](f);
+                });
+            },
+
+            getCounts: function () {
+                return this.findComponents('todo-item').reduce(function (result, todoItem) {
+
+                    if (todoItem.isComplete()) {
+                        result.complete += 1;
+                    }
+                    else {
+                        result.active += 1;
+                    }
+
+                    result.total += 1;
+                    return result;
+
+                }, {total: 0, complete: 0, active: 0});
+            },
+
+            updateCounts: function () {
+
+                var counts = this.getCounts();
+                var main = this.find('#main')[0];
+                var footer = this.find('#footer')[0];
+
+                if (!counts.total) {
+                    main.classList.add('hidden');
+                    footer.classList.add('hidden');
+                    return;
                 }
-            });
-        },
 
-        onFilterSelected: function (event) {
-            var filter = event.filter;
-            var main = this.find('#main')[0];
+                this.find('#toggle-all')[0].checked = counts.complete === counts.total;
 
-            ['all', 'completed', 'active'].forEach(function (f) {
-                main.classList[f === filter ? 'add' : 'remove'](f);
-            });
-        },
+                main.classList.remove('hidden');
+                footer.classList.remove('hidden');
+                this.find('.todos-total-count')[0].innerHTML = counts.active + ' item(s) left';
 
-        getCounts: function () {
-            return this.findComponents('todo-item').reduce(function (result, todoItem) {
+                this.find('.todos-completed-count')[0].innerHTML = counts.complete;
+                this.find('#clear-completed')[0].classList[counts.complete ? 'remove' : 'add']('hidden');
+            }
 
-                if (todoItem.isComplete()) {
-                    result.complete += 1;
+        });
+
+        baustein.register('todos-form', {
+
+            template: document.getElementById('todos-form-template').innerHTML,
+
+            setupEvents: function (add) {
+                add('submit', this.onSave);
+            },
+
+            onSave: function (event) {
+                event.preventDefault();
+
+                var input = this.find('[name=todo-name]')[0];
+                var title = input.value;
+                input.value = '';
+
+                if (!title) {
+                    return;
                 }
-                else {
-                    result.active += 1;
+
+                this.emit('new-todo', {
+                    title: title
+                });
+            }
+
+        });
+
+        baustein.register('todos-footer', {
+
+            template: document.getElementById('todos-footer-template').innerHTML,
+
+            setupEvents: function (add) {
+                add('click', '#clear-completed', this.onClearCompleted);
+                add('click', '.todos-filter', this.onFilterSelected);
+            },
+
+            onClearCompleted: function () {
+                this.emit('clear-completed');
+            },
+
+            onFilterSelected: function (event, link) {
+                event.preventDefault();
+
+                if (link.classList.contains('selected')) {
+                    return;
                 }
 
-                result.total += 1;
-                return result;
+                this.find('.todos-filter').forEach(function (l) {
+                    l.classList[l === link ? 'add' : 'remove']('selected');
+                });
 
-            }, {total: 0, complete: 0, active: 0});
-        },
+                this.emit('filter-selected', {
+                    filter: link.href.substring(link.href.lastIndexOf('#') + 2)
+                });
 
-        updateCounts: function () {
-
-            var counts = this.getCounts();
-            var main = this.find('#main')[0];
-            var footer = this.find('#footer')[0];
-
-            if (!counts.total) {
-                main.classList.add('hidden');
-                footer.classList.add('hidden');
-                return;
             }
 
-            this.find('#toggle-all')[0].checked = counts.complete === counts.total;
+        });
 
-            main.classList.remove('hidden');
-            footer.classList.remove('hidden');
-            this.find('.todos-total-count')[0].innerHTML = counts.active + ' item(s) left';
+        var ToDoItem = baustein.register('todo-item', {
 
-            this.find('.todos-completed-count')[0].innerHTML = counts.complete;
-            this.find('#clear-completed')[0].classList[counts.complete ? 'remove' : 'add']('hidden');
-        }
+            tagName: 'li',
 
-    });
+            template: function () {
+                var template = document.getElementById('todo-item-template').innerHTML;
+                return template.replace(/\{\{ title \}\}/g, this.options.title);
+            },
 
-    baustein.register('todos-form', {
+            setupEvents: function (add) {
+                add('change', '.toggle', this.onStateChange);
+                add('dblclick', 'label', this.onEditTitle);
+                add('blur', '.edit', this.onDoneEditingTitle);
+                add('keyup', '.edit', this.onTitleChange);
+                add('submit', 'form', this.onDoneEditingTitle);
+                add('click', '.destroy', this.destroy);
+            },
 
-        template: document.getElementById('todos-form-template').innerHTML,
+            init: function () {
+                this.el.classList.add('active');
+            },
 
-        setupEvents: function (add) {
-            add('submit', this.onSave);
-        },
+            onEditTitle: function () {
+                this.el.classList.add('editing');
+                var input = this.find('.edit')[0];
+                input.selectionStart = input.selectionEnd = this.options.title.length;
+            },
 
-        onSave: function (event) {
-            event.preventDefault();
+            onTitleChange: function (e, input) {
+                this.options.title = input.value;
+            },
 
-            var input = this.find('[name=todo-name]')[0];
-            var title = input.value;
-            input.value = '';
+            onDoneEditingTitle: function (event) {
+                event.preventDefault();
+                this.el.classList.remove('editing');
+                this.find('label.view')[0].innerHTML = this.options.title;
+            },
 
-            if (!title) {
-                return;
+            onStateChange: function (event, input) {
+                this._update(input.checked);
+            },
+
+            select: function () {
+                this.find('.toggle')[0].checked = true;
+                this._update(true);
+            },
+
+            deselect: function () {
+                this.find('.toggle')[0].checked = false;
+                this._update(false);
+            },
+
+            _update: function (done) {
+
+                // no change required
+                if (this.isComplete() === done) {
+                    return;
+                }
+
+                this.el.classList[done ? 'add' : 'remove']('completed');
+
+                this.emit('status-change', {
+                    completed: done
+                });
+            },
+
+            isComplete: function () {
+                return this.el.classList.contains('completed');
             }
 
-            this.emit('new-todo', {
-                title: title
-            });
-        }
+        });
+
+        baustein.init();
 
     });
-
-    baustein.register('todos-footer', {
-
-        template: document.getElementById('todos-footer-template').innerHTML,
-
-        setupEvents: function (add) {
-            add('click', '#clear-completed', this.onClearCompleted);
-            add('click', '.todos-filter', this.onFilterSelected);
-        },
-
-        onClearCompleted: function () {
-            this.emit('clear-completed');
-        },
-
-        onFilterSelected: function (event, link) {
-            event.preventDefault();
-
-            if (link.classList.contains('selected')) {
-                return;
-            }
-
-            this.find('.todos-filter').forEach(function (l) {
-                l.classList[l === link ? 'add' : 'remove']('selected');
-            });
-
-            this.emit('filter-selected', {
-                filter: link.href.substring(link.href.lastIndexOf('#') + 2)
-            });
-
-        }
-
-    });
-
-    var ToDoItem = baustein.register('todo-item', {
-
-        tagName: 'li',
-
-        template: function () {
-            var template = document.getElementById('todo-item-template').innerHTML;
-            return template.replace(/\{\{ title \}\}/g, this.options.title);
-        },
-
-        setupEvents: function (add) {
-            add('change', '.toggle', this.onStateChange);
-            add('dblclick', 'label', this.onEditTitle);
-            add('blur', '.edit', this.onDoneEditingTitle);
-            add('keyup', '.edit', this.onTitleChange);
-            add('submit', 'form', this.onDoneEditingTitle);
-            add('click', '.destroy', this.destroy);
-        },
-
-        init: function () {
-            this.el.classList.add('active');
-        },
-
-        onEditTitle: function () {
-            this.el.classList.add('editing');
-            var input = this.find('.edit')[0];
-            input.selectionStart = input.selectionEnd = this.options.title.length;
-        },
-
-        onTitleChange: function (e, input) {
-            this.options.title = input.value;
-        },
-
-        onDoneEditingTitle: function (event) {
-            event.preventDefault();
-            console.log('ok');
-            this.el.classList.remove('editing');
-            this.find('label.view')[0].innerHTML = this.options.title;
-        },
-
-        onStateChange: function (event, input) {
-            this._update(input.checked);
-        },
-
-        select: function () {
-            this.find('.toggle')[0].checked = true;
-            this._update(true);
-        },
-
-        deselect: function () {
-            this.find('.toggle')[0].checked = false;
-            this._update(false);
-        },
-
-        _update: function (done) {
-
-            // no change required
-            if (this.isComplete() === done) {
-                return;
-            }
-
-            this.el.classList[done ? 'add' : 'remove']('completed');
-
-            this.emit('status-change', {
-                completed: done
-            });
-        },
-
-        isComplete: function () {
-            return this.el.classList.contains('completed');
-        }
-
-    });
-
-    baustein.init();
 
 </script>
 </body>

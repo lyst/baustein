@@ -61,73 +61,77 @@
 </script>
 
 
-<script src="../../../dist/baustein.globals.js"></script>
+<script src="../../../node_modules/requirejs/require.js"></script>
 <script>
 
-    baustein.register('my-app', {
+    require(["../../../dist/baustein.amd.js"], function (baustein) {
 
-        setupEvents: function (add) {
-            add('open-overlay', 'my-button', this.openOverlay);
-        },
+        baustein.register('my-app', {
 
-        openOverlay: function (event) {
-            var overlay = new MyOverlay({
-                id: event.id
-            });
-            overlay.appendTo(this.el);
-        }
+            setupEvents: function (add) {
+                add('open-overlay', 'my-button', this.openOverlay);
+            },
 
-    });
-
-    baustein.register('my-button', {
-
-        setupEvents: function (add) {
-            add('click', this.onClick);
-        },
-
-        onClick: function () {
-            this.emit('open-overlay', {
-                id: this.options.id
-            });
-        }
-
-    });
-
-    var MyOverlay = baustein.register('my-overlay', {
-
-        template: function () {
-            var template = document.getElementById('my-overlay-template').innerHTML;
-            return template.replace(/\{\{ id \}\}/g, this.options.id);
-        },
-
-        setupEvents: function (add) {
-            add('click', this.onBackdropClick);
-            add('click', '.my-overlay-close-button', this.close);
-        },
-
-        onInsert: function () {
-            // trigger a re-flow on this element
-            this.el.offsetLeft;
-
-            requestAnimationFrame(function () {
-                this.el.classList.add('show');
-            }.bind(this));
-        },
-
-        onBackdropClick: function (event) {
-            if (event.target === this.el) {
-                this.close();
+            openOverlay: function (event) {
+                var overlay = new MyOverlay({
+                    id: event.id
+                });
+                overlay.appendTo(this.el);
             }
-        },
 
-        close: function () {
-            this.el.classList.remove('show');
-            setTimeout(this.remove.bind(this), 500);
-        }
+        });
+
+        baustein.register('my-button', {
+
+            setupEvents: function (add) {
+                add('click', this.onClick);
+            },
+
+            onClick: function () {
+                this.emit('open-overlay', {
+                    id: this.options.id
+                });
+            }
+
+        });
+
+        var MyOverlay = baustein.register('my-overlay', {
+
+            template: function () {
+                var template = document.getElementById('my-overlay-template').innerHTML;
+                return template.replace(/\{\{ id \}\}/g, this.options.id);
+            },
+
+            setupEvents: function (add) {
+                add('click', this.onBackdropClick);
+                add('click', '.my-overlay-close-button', this.close);
+            },
+
+            onInsert: function () {
+                // trigger a re-flow on this element
+                this.el.offsetLeft;
+
+                requestAnimationFrame(function () {
+                    this.el.classList.add('show');
+                }.bind(this));
+            },
+
+            onBackdropClick: function (event) {
+                if (event.target === this.el) {
+                    this.close();
+                }
+            },
+
+            close: function () {
+                this.el.classList.remove('show');
+                setTimeout(this.remove.bind(this), 500);
+            }
+
+        });
+
+        baustein.init();
 
     });
-
-    baustein.init();
 
 </script>
 </body>
