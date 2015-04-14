@@ -20,7 +20,7 @@ The design goals are:
 
 **JS**
 ```js
-components.register('my-button', {
+baustein.register('my-button', {
 
     setupEvents: function (add) {
         add('click', this.onClick);
@@ -36,7 +36,7 @@ components.register('my-button', {
 The `is` attribute this tells **baustein** that it should create an instance of the `my-button` component for this element. Each component instance has it's own state so if you wanted to have lots of `my-button` components on a page and you want to keep track of how many times each one has been clicked then you could do the following.
 
 ```js
-components.register('my-button', {
+baustein.register('my-button', {
 
     clickCount: 0,
 
@@ -63,7 +63,7 @@ A component can emit events that can be listened to by any parent components. Th
 ```
 
 ```js
-components.register('user-profile', {
+baustein.register('user-profile', {
 
     setupEvents: function (add) {
         add('user-settings', 'save', this.onSettingsSave);
@@ -76,7 +76,7 @@ components.register('user-profile', {
 
 });
 
-components.register('user-settings', {
+baustein.register('user-settings', {
 
     setupEvents: function (add) {
         add('.some-form', 'submit', this.onSubmit);
