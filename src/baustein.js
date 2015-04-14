@@ -733,11 +733,12 @@ export function init(options) {
         domWrapper = options.domWrapper;
     }
 
+    bindEvents();
+
     // by calling `nodeInserted` not only will all the components present at page load be parsed
     // but `onInsert` will be called and the "inserted" event will be emitted on each
     nodeInserted(doc.body);
 
-    bindEvents();
 }
 
 /**
