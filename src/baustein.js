@@ -84,7 +84,8 @@ var allEvents = {
     submit: true,
     change: true,
     resize: true,
-    load: true
+    load: true,
+    orientationchange: true
 };
 
 /**
@@ -627,7 +628,7 @@ function eventManager(method) {
     for (key in allEvents) {
 
         // special case for resize and scroll event to listen on window
-        el = ['resize', 'scroll'].indexOf(key) !== -1 ? window : doc.body;
+        el = ['resize', 'scroll', 'orientationchange'].indexOf(key) !== -1 ? window : doc.body;
 
         el[method](key, handleEvent, !!allEvents[key]);
     }
