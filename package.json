@@ -1,6 +1,6 @@
 {
   "name": "baustein",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "scripts": {
     "test": "grunt build && grunt test"
   },
