@@ -85,7 +85,8 @@ var allEvents = {
     change: true,
     resize: true,
     load: true,
-    orientationchange: true
+    orientationchange: true,
+    input: false,
 };
 
 /**
