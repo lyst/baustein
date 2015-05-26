@@ -151,6 +151,15 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                 }).options.foo).to.equal('passed value');
             });
 
+            it('should support passing the template function as an option', function () {
+                var c = new Component({
+                    template: function () {
+                        return '<div>hi there</div>';
+                    }
+                });
+                expect(c.el.innerHTML).to.equal('hi there');
+            });
+
             it('should call setupEvents passing it a bound version of registerEvent', function () {
 
                 var handler = sinon.spy();
@@ -207,6 +216,37 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     expect(spy.getCall(0).calledOn(component)).to.be.ok();
                 });
 
+                it('should set up the domQuery and domWrapper functions', function () {
+                    var c;
+
+                    baustein.reset();
+
+                    var domQuerySpy = sinon.spy(function () {
+                        return [1, 2, 3]
+                    });
+
+                    var domWrapperSpy = sinon.spy(function () {
+                        return [4, 5, 6];
+                    });
+
+                    baustein.init({
+                        domQuery: domQuerySpy,
+                        domWrapper: domWrapperSpy
+                    });
+
+                    c = new Component();
+                    expect(c.find('.foo')).to.eql([4, 5, 6]);
+                    expect(c.$el).to.eql([4, 5, 6]);
+
+                    expect(domQuerySpy.callCount).to.equal(1);
+                    expect(domQuerySpy.getCall(0).args[0]).to.equal(c.el);
+                    expect(domQuerySpy.getCall(0).args[1]).to.equal('.foo');
+
+                    expect(domWrapperSpy.callCount).to.equal(2);
+                    expect(domWrapperSpy.getCall(0).args[0]).to.eql([c.el]);
+                    expect(domWrapperSpy.getCall(1).args[0]).to.eql([1, 2, 3]);
+                });
+
             });
 
             describe('#remove()', function () {
@@ -248,45 +288,6 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     expect(c.el).to.equal(null);
                 });
 
-                it('should emit the "destroy" event', function () {
-
-                    var C = baustein.register(createComponentName());
-
-                    var def = {
-                        setupEvents: function (add) {
-                            add('destroy', C.prototype.name, this.destroyEventHandler);
-                        },
-                        destroyEventHandler: sinon.spy()
-                    };
-
-                    // this is a component that is listening for the
-                    // 'destroy' event from the C component
-                    var C2 = baustein.register(createComponentName(), def);
-
-                    // set up component hierarchy
-                    var c1 = new C2();
-                    var c2 = new C2();
-                    var c3 = new C2();
-                    var c4 = new C();
-                    c3.el.appendChild(c4.el);
-                    c2.el.appendChild(c3.el);
-                    c1.el.appendChild(c2.el);
-
-                    // assert the handler has not been called
-                    expect(def.destroyEventHandler.callCount).to.equal(0);
-
-                    // destroy the inner most child element
-                    c4.destroy();
-
-                    // assert handler was called correct number of times
-                    expect(def.destroyEventHandler.callCount).to.equal(3);
-
-                    // check event bubbled up the dom firing on components in the correct order
-                    [c3, c2, c1].forEach(function (c, i) {
-                        expect(def.destroyEventHandler.getCall(i).calledOn(c)).to.be.ok();
-                    });
-                });
-
                 it('should return null if the component has already been destroyed', function () {
                     var c = new Component();
                     c.destroy();
@@ -294,14 +295,7 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                 });
 
                 it('should call destroy() on all child components', function () {
-
-                    var destroyEventHandler = sinon.spy();
-
-                    var Container = baustein.register(createComponentName(), {
-                        setupEvents: function (add) {
-                            add('destroy', destroyEventHandler);
-                        }
-                    });
+                    var Container = baustein.register(createComponentName());
 
                     var C = baustein.register(createComponentName());
 
@@ -331,12 +325,6 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     // check destroy() was called on each component in the expected order
                     expect(parent.destroy.calledBefore(child.destroy)).to.equal(true);
                     expect(child.destroy.calledBefore(grandchild.destroy)).to.equal(true);
-
-                    // check that the 'destroy' event was emitted once per component, and in the expected order
-                    expect(destroyEventHandler.callCount).to.equal(3);
-                    expect(destroyEventHandler.getCall(0).args[0].target).to.equal(grandchild);
-                    expect(destroyEventHandler.getCall(1).args[0].target).to.equal(child);
-                    expect(destroyEventHandler.getCall(2).args[0].target).to.equal(parent);
                 });
 
                 it('during the emitting of the "destroy" event isDestroying() is true', function () {
@@ -388,39 +376,62 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
             describe('#render()', function () {
 
-                describe('when the template property is a function', function () {
-
-                    it('should invoke the function passing "this" as the first argument', function () {
-
-                        var C = baustein.register(createComponentName(), {
-                            template: function (ctx) {
-                                return '<span>' + ctx.options.text + '</span>';
-                            }
-                        });
-
-                        var actual = new C({text: 'Hello world'}).el.innerHTML;
-                        var expected = '<span>Hello world</span>';
-
-                        expect(actual).to.equal(expected);
+                it('should do nothing if this.template is not a function', function () {
+                    var C = baustein.register(createComponentName(), {
+                        template: null
                     });
-
+                    var c = new C();
+                    expect(c.render()).to.equal(c);
                 });
 
-                describe('when the template property is a string', function () {
+                it('should call getRenderContext() to get the context for the template function', function () {
+                    var C = baustein.register(createComponentName(), {
+                        template: function (context) {
+                            return '<div>' + context.count + '</div>';
+                        },
+                        getRenderContext: function () {
+                            return {
+                                count: 5
+                            }
+                        }
+                    });
+                    var c = new C();
+                    expect(c.el.innerHTML).to.equal('5');
+                });
 
-                    it('it should add it to el', function () {
+                it('should throw an error if the template function does not return an HTML string representing a single node', function () {
 
-                        var content = '<span>Hello world</span>';
+                    [null, 'wat', '<p></p><p></p>'].forEach(function (invalid) {
+                        function factory() {
+                            var C = baustein.register(createComponentName(), {
+                                template: function () {
+                                    return invalid
+                                }
+                            });
+                            return new C();
+                        }
 
-                        var C = baustein.register(createComponentName(), {
-                            template: content
-                        });
+                        expect(factory).to.throwError('A component template must product a single DOM node.');
+                    });
+                });
 
-                        var actual = new C().el.innerHTML;
+                it('should invoke the function passing "this" as the first argument', function () {
 
-                        expect(actual).to.equal(content);
+                    var C = baustein.register(createComponentName(), {
+                        tagName: 'span',
+                        template: function (ctx) {
+                            var toLower = function (s) {
+                                return s.toLowerCase();
+                            };
+                            var className = ctx.options.text.split(' ').map(toLower).join('-');
+                            return '<span class="' + className + '">' + ctx.options.text + '</span>';
+                        }
                     });
 
+                    var c = new C({text: 'Hello world'});
+
+                    expect(c.el.innerHTML).to.equal('Hello world');
+                    expect(c.el.className).to.equal('hello-world');
                 });
 
             });
@@ -774,6 +785,29 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
                 });
 
+                it('should accept a component', function () {
+                    var c1 = new Component();
+                    var c2 = new Component();
+                    var container = document.createElement('div');
+
+                    c1.appendTo(container);
+                    c2.insertBefore(c1);
+
+                    expect(container.childNodes[0]).to.equal(c2.el);
+                    expect(container.childNodes[1]).to.equal(c1.el);
+                });
+
+                it('should do nothing if the target has no parent', function () {
+                    var c = new Component();
+                    var target = document.createElement('div');
+                    expect(c.insertBefore(target)).to.equal(c);
+                });
+
+                it('should do nothing if the target is not an element or a component', function () {
+                    var c = new Component();
+                    expect(c.insertBefore(null)).to.equal(c);
+                });
+
             });
 
             describe('#insertAfter(element)', function () {
@@ -782,7 +816,6 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     var c = new Component();
                     expect(c.insertAfter()).to.equal(c);
                 });
-
 
                 it('should insert itself after the child element', function () {
 
@@ -798,6 +831,18 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     expect(root.children[1]).to.equal(c.el);
                     expect(root.children[2]).to.equal(child2);
 
+                });
+
+                it('should accept a component', function () {
+                    var c1 = new Component();
+                    var c2 = new Component();
+                    var container = document.createElement('div');
+
+                    c1.appendTo(container);
+                    c2.insertAfter(c1);
+
+                    expect(container.childNodes[0]).to.equal(c1.el);
+                    expect(container.childNodes[1]).to.equal(c2.el);
                 });
 
                 it('should insert itself as the last child if inserted after the last child', function () {
@@ -828,6 +873,17 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     expect(root.childNodes[2]).to.equal(textNode);
                     expect(root.childNodes[3]).to.equal(child2);
 
+                });
+
+                it('should do nothing if the target has no parent', function () {
+                    var c = new Component();
+                    var target = document.createElement('div');
+                    expect(c.insertAfter(target)).to.equal(c);
+                });
+
+                it('should do nothing if the target is not an element or a component', function () {
+                    var c = new Component();
+                    expect(c.insertAfter(null)).to.equal(c);
                 });
 
             });
@@ -919,6 +975,38 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
                     expect(c._events[0]).to.eql(['click', null, handler]);
                     expect(c._events[1]).to.eql(['click', '.some-selector', handler]);
+
+                });
+
+                it('should support filtering custom events by component name', function () {
+
+                    var name1 = createComponentName();
+                    var name2 = createComponentName();
+                    var name3 = createComponentName();
+
+                    var container = new Component();
+                    var C1 = baustein.register(name1);
+                    var C2 = baustein.register(name2);
+                    var C3 = baustein.register(name3);
+
+                    var c1 = new C1();
+                    var c2 = new C2();
+                    var c3 = new C3();
+
+                    container.el.appendChild(c1.el);
+                    container.el.appendChild(c2.el);
+                    container.el.appendChild(c3.el);
+
+                    var handler = sinon.spy();
+
+                    container.registerEvent('foo', name1, handler);
+
+                    c1.emit('foo');
+                    c2.emit('foo');
+                    c3.emit('foo');
+
+                    expect(handler.callCount).to.equal(1);
+                    expect(handler.getCall(0).args[0].target).to.equal(c1);
 
                 });
 
@@ -1115,42 +1203,6 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
             });
 
-            describe('the "inserted" event', function () {
-
-                it('should be emitted when a component is inserted', function (done) {
-
-                    var parentName = createComponentName();
-                    var childName = createComponentName();
-                    var spy = sinon.spy();
-
-                    var Parent = baustein.register(parentName, {
-                        setupEvents: function (add) {
-                            add('inserted', childName, spy);
-                        }
-                    });
-                    var Child = baustein.register(childName);
-
-                    var parent = new Parent();
-                    var child = new Child();
-
-                    parent.appendTo(document.body);
-
-                    expect(spy.callCount).to.equal(0);
-
-                    child.appendTo(parent);
-
-                    // MutationObserver and mutation events are asynchronous so have to use a
-                    // setTimeout, 100ms should be more than enough.
-                    setTimeout(function () {
-                        expect(spy.callCount).to.equal(1);
-                        expect(spy.getCall(0).args[0]).to.have.property('target', child);
-                        done();
-                    }, 100);
-
-                });
-
-            });
-
         });
 
         describe('baustein.register(name, implementation)', function () {
@@ -1221,6 +1273,62 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                 // check they were called in the correct order
                 expect(myMixin.setupEvents.calledBefore(myOtherMixin.setupEvents)).to.equal(true);
                 expect(myOtherMixin.setupEvents.calledBefore(myMethod)).to.equal(true);
+            });
+
+        });
+
+        describe('#isAttached()', function () {
+
+            it('should return false when the element is not attached to the DOM.', function () {
+                var C = baustein.register(createComponentName());
+                var c = new C();
+                expect(c.isAttached()).to.equal(false);
+            });
+
+            it('should return true when the element is attached to the DOM.', function (done) {
+                var C = baustein.register(createComponentName(), {
+                    onInsert: function () {
+                        expect(this.isAttached()).to.equal(true);
+                        done();
+                    }
+                });
+                var c = new C();
+                c.appendTo(document.body);
+            });
+
+            it('should return false when the element is destroyed', function () {
+                var C = baustein.register(createComponentName());
+                var c = new C();
+                c.destroy();
+                expect(c.isAttached()).to.equal(false);
+            });
+
+        });
+
+        describe('#isDetached()', function () {
+
+            it('should return true when the element is not attached to the DOM.', function () {
+                var C = baustein.register(createComponentName());
+                var c = new C();
+                expect(c.isDetached()).to.equal(true);
+            });
+
+            it('should return false when the element is attached to the DOM.', function (done) {
+                var C = baustein.register(createComponentName(), {
+                    onInsert: function () {
+                        expect(this.isDetached()).to.equal(false);
+                        done();
+                    }
+                });
+                var c = new C();
+                c.appendTo(document.body);
+            });
+
+            it('should return false when the element is destroyed', function () {
+                var C = baustein.register(createComponentName());
+                var c = new C();
+                c.destroy();
+                expect(c.isDetached()).to.equal(false);
             });
 
         });
@@ -1420,12 +1528,33 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
         });
 
-        describe('baustein.parse()', function () {
+        describe('baustein.parse(node, ignoreRoot)', function () {
 
             it('should throw an error if the passed argument is not an element', function () {
                 expect(baustein.parse).withArgs(null).to.throwException();
                 expect(baustein.parse).withArgs(document.createTextNode('hello')).to.throwException();
                 expect(baustein.parse).withArgs({}).to.throwException();
+            });
+
+            it('should not include the root node if the second argument is true', function () {
+                var C = baustein.register(createComponentName());
+                var c1 = new C();
+                var c2 = new C();
+                c2.appendTo(c1);
+
+                expect(baustein.parse(c1.el)).to.eql([c1, c2]);
+                expect(baustein.parse(c1.el, true)).to.eql([c2]);
+            });
+
+        });
+
+        describe('baustein.parse()', function () {
+
+            it('should parse the body if no arguments are passed', function () {
+                var C = baustein.register(createComponentName());
+                var c = new C();
+                c.appendTo(document.body);
+                expect(baustein.parse()).to.eql([c]);
             });
 
         });

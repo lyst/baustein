@@ -40,25 +40,14 @@ var componentInstances = {};
 var globalHandlers = {};
 
 /**
- * If `handleEvent` is called while already handing an event then the arguments will be pushed
- * into this array and then handled after the current event has been handled.
- * @type {Array}
- */
-var pendingEvents = [];
-
-/**
- * Flag indicating whether an event is currently being handled.
- * @type {boolean}
- */
-var handlingEvent = false;
-
-/**
  * Incrementing number used to give each component a unique id.
  * @type {Number}
  */
 var nextComponentId = 1;
 
 var dataComponentIdAttribute = 'data-component-id';
+
+var tmpEl = doc.createElement('div');
 
 /**
  * Map of event name -> flag indicating whether or not to use useCapture
@@ -401,21 +390,14 @@ var handleEventQueue = [];
  * If the event is a custom Component event then the target is the component that emitted the event.
  *
  * @param {Event} event
- * @param {Component[]} [componentsChain] Only used internally when a chain of Components is
- *                                        already available.
  */
-export function handleEvent(event, componentsChain) {
+export function handleEvent(event) {
 
     ensureEventHasMethod(event, 'stopPropagation', 'propagationStopped');
     ensureEventHasMethod(event, 'preventDefault', 'defaultPrevented');
 
-    // if a components chain wasn't passed generate it from the target
-    if (!componentsChain) {
-        componentsChain = parentComponents(event.target);
-    }
-
     // push a job to the queue for each component
-    componentsChain.forEach(function (c) {
+    parentComponents(event.target).forEach(function (c) {
         handleEventQueue.push([event, c, false]);
     });
 
@@ -454,11 +436,6 @@ function processEventForComponent(event, component) {
     }
 
     events = component._events;
-
-    // if component has no events then nothing to do
-    if (!events) {
-        return;
-    }
 
     for (i = 0, eventsLength = events.length; i < eventsLength; i++) {
 
@@ -528,11 +505,11 @@ function processEventForGlobalHandlers(event) {
 
 /**
  * Parses the given element or the root element and creates Component instances.
- * @param {HTMLElement} [node]
- * @param {boolean=false} [ignoreRoot]
+ * @param {HTMLElement} [node] If not provided then the <body> will be parsed.
+ * @param {boolean} [ignoreRootNode=false] If not provided then the <body> will be parsed.
  * @returns {Component[]}
  */
-export function parse(node, ignoreRoot) {
+export function parse(node, ignoreRootNode) {
 
     if (arguments.length === 0) {
         node = doc.body;
@@ -541,14 +518,11 @@ export function parse(node, ignoreRoot) {
         throw new Error('node must be an HTMLElement');
     }
 
-    // allow DOM element or nothing
-    node = isElement(node) ? node : doc.body;
-
     var els = slice.call(node.querySelectorAll('[is]'));
     var component;
 
-    // add the root element to the front
-    if (ignoreRoot !== true) {
+    // if it's not being ignored add the root element to the front
+    if (ignoreRootNode !== true) {
         els.unshift(node);
     }
 
@@ -723,7 +697,6 @@ function nodeInserted(node) {
         });
 
         invoke(components, 'onInsert');
-        invoke(components, 'emit', 'inserted');
     }
 }
 
@@ -841,6 +814,43 @@ var STATE_DESTROYING = 3;
 var STATE_DESTROYED = 4;
 
 /**
+ * Reducer function that can be used to turn a list of attributes into a JS object where the
+ * attribute names map to attribute values.
+ * @param {object} result
+ * @param {Attr} attr A DOM node attribute
+ * @returns {object}
+ */
+function attributeReducer(result, attr) {
+    result = result || {};
+    result[attr.name] = attr.value;
+    return result;
+}
+
+/**
+ * Copy all attributes from `source` to `target` and remove any attributes from `target` that are
+ * not present on `source`. The data-component-id attribute is ignored.
+ * @param {HTMLElement} target
+ * @param {HTMLElement} source
+ */
+function copyAttributes(target, source) {
+    var targetAttributes = slice.call(target.attributes).reduce(attributeReducer, {});
+    var sourceAttributes = slice.call(source.attributes).reduce(attributeReducer, {});
+
+    // copy all attributes from the source to the target
+    Object.keys(sourceAttributes).forEach(function (attrName) {
+        target.setAttribute(attrName, sourceAttributes[attrName]);
+    });
+
+    // remove any attributes (except for data-component-id) from the target that are not
+    // present on the source.
+    Object.keys(targetAttributes).forEach(function (attrName) {
+        if (attrName !== dataComponentIdAttribute && !sourceAttributes.hasOwnProperty(attrName)) {
+            target.removeAttribute(attrName);
+        }
+    });
+}
+
+/**
  * Creates a new Component
  * @param element
  * @param options
@@ -900,8 +910,10 @@ Component.prototype = {
     tagName: 'div',
 
     /**
-     * If set to a function it will be called with the
-     * component as both 'this' and as the first argument.
+     * If provided this will be used to render the component when `render()` is called. It should
+     * be a function that accepts a single argument, which will be the return value of `getRenderContext()`.
+     * It must return a valid HTML string and represent the entire component, including the root node.
+     * @type {function}
      */
     template: null,
 
@@ -926,18 +938,43 @@ Component.prototype = {
     setupEvents: noop,
 
     /**
-     * Renders the contents of the component into the root element.
+     * Renders the component using `template`. This method performs a destructive render e.g. all
+     * child components will first be destroyed.
      * @returns {Component}
      */
     render: function () {
         var template = this.template;
-        var templateIsFunction = isFunction(template);
-        var templateIsString = isString(template);
+        var html, newElement;
 
-        if (templateIsFunction || templateIsString) {
-            this.el.innerHTML = templateIsFunction ? template.call(this, this) : template;
+        if (!isFunction(template)) {
+            return this;
         }
 
+        html = template.call(this, this.getRenderContext());
+
+        tmpEl.innerHTML = html;
+
+        if (tmpEl.children.length !== 1) {
+            throw new Error('A component template must produce a single DOM node.');
+        }
+
+        newElement = tmpEl.firstElementChild;
+        tmpEl.innerHTML = '';
+
+        if (newElement.tagName !== this.el.tagName) {
+            throw new Error('Cannot change the tagName of an element.');
+        }
+
+        // destroy all children of the target as they are about to be re-rendered
+        invoke(parse(this.el, true), 'destroy');
+
+        this.el.innerHTML = newElement.innerHTML;
+        copyAttributes(this.el, newElement);
+
+        return this;
+    },
+
+    getRenderContext: function () {
         return this;
     },
 
@@ -945,16 +982,15 @@ Component.prototype = {
      * Emits an event that parent Components can listen to.
      * @param name The name of the event to emit
      * @param [data] Event data
-     * @param [chain] Array of parent Components
      */
-    emit: function (name, data, chain) {
+    emit: function (name, data) {
 
         data = data || {};
         data.target = data.target || this;
         data.type = name;
         data.customEvent = true;
 
-        handleEvent(data, chain);
+        handleEvent(data);
         return data;
     },
 
@@ -1067,19 +1103,13 @@ Component.prototype = {
 
         this._state = STATE_DESTROYING;
 
-        // Get the parent chain of Components
-        var chain = parentComponents(this.el);
-
-        // Invoke destroy on all child Components
+        // invoke destroy on all child Components
         invoke(parse(this.el, true), 'destroy');
 
         // Make sure this component is removed
         this.remove();
 
         this.releaseAllGlobalHandlers();
-
-        // emit the destroy event passing the chain (as now the component is detached
-        this.emit('destroy', null, chain);
 
         // We are now destroyed!
         this._state = STATE_DESTROYED;
