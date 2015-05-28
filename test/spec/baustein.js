@@ -248,24 +248,6 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     expect(c.el).to.equal(null);
                 });
 
-                it('should call beforeDestroy() on itself and all child components', function () {
-
-                    var def = {
-                        beforeDestroy: sinon.spy()
-                    };
-                    var C = baustein.register(createComponentName(), def);
-
-                    var c1 = new C();
-                    var c2 = new C();
-                    var c3 = new C();
-
-                    c2.el.appendChild(c3.el);
-                    c1.el.appendChild(c2.el);
-
-                    c1.destroy();
-                    expect(def.beforeDestroy.callCount).to.equal(3);
-                });
-
                 it('should emit the "destroy" event', function () {
 
                     var C = baustein.register(createComponentName());
@@ -309,6 +291,52 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     var c = new Component();
                     c.destroy();
                     expect(c.destroy()).to.equal(null);
+                });
+
+                it('should call destroy() on all child components', function () {
+
+                    var destroyEventHandler = sinon.spy();
+
+                    var Container = baustein.register(createComponentName(), {
+                        setupEvents: function (add) {
+                            add('destroy', destroyEventHandler);
+                        }
+                    });
+
+                    var C = baustein.register(createComponentName());
+
+                    var container = new Container();
+                    var parent = new C();
+                    var child = new C();
+                    var grandchild = new C();
+
+                    sinon.spy(parent, 'destroy');
+                    sinon.spy(child, 'destroy');
+                    sinon.spy(grandchild, 'destroy');
+
+                    grandchild.appendTo(child);
+                    child.appendTo(parent);
+                    parent.appendTo(container);
+
+                    parent.destroy();
+
+                    expect(parent.destroy.callCount).to.equal(1);
+                    expect(child.destroy.callCount).to.equal(1);
+
+                    // We expect this to be called twice as it will first be called as a result
+                    // of `parent` calling destroy on all it's children and then again as a result
+                    // of `child` calling destroy on all it's children.
+                    expect(grandchild.destroy.callCount).to.equal(2);
+
+                    // check destroy() was called on each component in the expected order
+                    expect(parent.destroy.calledBefore(child.destroy)).to.equal(true);
+                    expect(child.destroy.calledBefore(grandchild.destroy)).to.equal(true);
+
+                    // check that the 'destroy' event was emitted once per component, and in the expected order
+                    expect(destroyEventHandler.callCount).to.equal(3);
+                    expect(destroyEventHandler.getCall(0).args[0].target).to.equal(grandchild);
+                    expect(destroyEventHandler.getCall(1).args[0].target).to.equal(child);
+                    expect(destroyEventHandler.getCall(2).args[0].target).to.equal(parent);
                 });
 
             });

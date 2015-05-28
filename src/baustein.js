@@ -86,7 +86,7 @@ var allEvents = {
     resize: true,
     load: true,
     orientationchange: true,
-    input: false,
+    input: false
 };
 
 /**
@@ -199,7 +199,7 @@ function extend (target) {
  */
 function closestElement (el, selector) {
 
-    while (el && el !== doc.body) {
+    while (isElement(el)) {
 
         if (matches(el, selector)) {
             return el;
@@ -443,6 +443,12 @@ export function handleEvent(event, componentsChain) {
         }
 
         component = componentsChain[i];
+
+        // We definitely don't want to handle events for destroyed elements.
+        if (component._state === STATE_DESTROYED) {
+            throw new Error('Trying to handle event on a destroyed component!');
+        }
+
         events = component._events;
 
         // if component has no events continue to next component
@@ -520,9 +526,10 @@ export function handleEvent(event, componentsChain) {
 /**
  * Parses the given element or the root element and creates Component instances.
  * @param {HTMLElement} [node]
+ * @param {boolean=false} [ignoreRoot]
  * @returns {Component[]}
  */
-export function parse(node) {
+export function parse(node, ignoreRoot) {
 
     if (arguments.length === 0) {
         node = doc.body;
@@ -538,13 +545,15 @@ export function parse(node) {
     var component;
 
     // add the root element to the front
-    els.unshift(node);
+    if (ignoreRoot !== true) {
+        els.unshift(node);
+    }
 
     return els.reduce(function (result, el) {
 
         component = fromElement(el);
 
-        if (component) {
+        if (component && component._state !== STATE_DESTROYED) {
             result.push(component);
         }
 
@@ -657,7 +666,7 @@ export function bindEvents() {
     eventManager('addEventListener');
 
     // use MutationObserver if available
-    if (window.MutationObserver) {
+    if (win.MutationObserver) {
         observer = new MutationObserver(function (records) {
             slice.call(records).forEach(function (record) {
                 slice.call(record.removedNodes).forEach(nodeRemoved);
@@ -699,7 +708,17 @@ export function unbindEvents() {
  */
 function nodeInserted(node) {
     if (isElement(node)) {
-        var components = parse(node);
+
+        // We only want components that think they are detached as IE10 can get a bit trigger
+        // happer with firing DOMNodeInserted events.
+        var components = parse(node).filter(function (c) {
+            if (c._state === STATE_DETACHED) {
+                c._state = STATE_ATTACHED;
+                return true;
+            }
+            return false;
+        });
+
         invoke(components, 'onInsert');
         invoke(components, 'emit', 'inserted');
     }
@@ -712,7 +731,18 @@ function nodeInserted(node) {
  */
 function nodeRemoved(node) {
     if (isElement(node)) {
-        invoke(parse(node), 'onRemove');
+
+        // We only want components that think they are attached as IE10 can get a bit trigger
+        // happer with firing DOMNodeRemoved events.
+        var components = parse(node).filter(function (c) {
+            if (c._state === STATE_ATTACHED) {
+                c._state = STATE_DETACHED;
+                return true;
+            }
+            return false;
+        });
+
+        invoke(components, 'onRemove');
     }
 }
 
@@ -802,6 +832,10 @@ export function destroy(name) {
     return this;
 }
 
+var STATE_DETACHED = 1;
+var STATE_ATTACHED = 2;
+var STATE_DESTROYED = 3;
+
 /**
  * Creates a new Component
  * @param element
@@ -819,8 +853,11 @@ export function Component (element, options) {
         element = this.createRootElement();
     }
 
+    // internals
     this._id = nextComponentId++;
     this._events = [];
+    this._state = STATE_DETACHED;
+
     this.el = element;
 
     // Convenience for accessing this components root element wrapped
@@ -987,18 +1024,12 @@ Component.prototype = {
      * Removes this component from the DOM.
      * @returns {Component}
      */
-    remove: function (chain) {
+    remove: function () {
 
         // cannot be removed if no element or no parent element
         if (!this.el || !this.el.parentElement) {
             return this;
         }
-
-        // get the chain of parent components if not passed
-        chain = chain || parentComponents(this.el, true);
-
-        // get all the child Components
-        var children = parse(this.el);
 
         // actually remove the element
         this.el.parentElement.removeChild(this.el);
@@ -1027,31 +1058,37 @@ Component.prototype = {
         }
 
         // get the parent chain of Components
-        chain = parentComponents(this.el, true);
+        chain = parentComponents(this.el);
 
-        // invoke remove passing the chain
-        this.remove(chain);
+        // invoke destroy on all child Components
+        invoke(parse(this.el, true), 'destroy');
 
-        // invoke before beforeDestroy on all child Components
-        invoke(parse(this.el), 'beforeDestroy');
+        // make sure this component is removed
+        this.remove();
 
-        // emit the destroy event passing the chain
+        // emit the destroy event passing the chain (as now the component is detached
         this.emit('destroy', null, chain);
 
-        // destroy everything
+        // remove the reference to the element and the dom wrapper
         this.el = null;
+        this.$el = null;
+
+        // update the state
+        this._state = STATE_DESTROYED;
 
         // use null assignment instead of delete
         // as delete has performance implications
         componentInstances[this._id] = null;
 
+        // remove any global handlers
+        Object.keys(globalHandlers).forEach(function (event) {
+            globalHandlers[event] = globalHandlers[event].filter(function (handler) {
+                return handler.ctx !== this;
+            }.bind(this));
+        }.bind(this));
+
         return null;
     },
-
-    /**
-     * Called before this Component is destroyed.
-     */
-    beforeDestroy: noop,
 
     /**
      * In the case that this Component is created directly by invoking the constructor with
@@ -1174,6 +1211,11 @@ Component.prototype = {
      * @returns {Component}
      */
     setGlobalHandler: function (event, fn) {
+
+        // Each component should only be able to set 1 global handler for a given event with
+        // the same function.
+        this.releaseGlobalHandler(event, fn);
+
         globalHandlers[event] = globalHandlers[event] || [];
 
         globalHandlers[event].push({
