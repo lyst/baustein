@@ -339,6 +339,51 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     expect(destroyEventHandler.getCall(2).args[0].target).to.equal(parent);
                 });
 
+                it('during the emitting of the "destroy" event isDestroying() is true', function () {
+
+                    var aName = createComponentName();
+                    var bName = createComponentName();
+
+                    var A = baustein.register(aName, {
+                        setupEvents: function (add) {
+                            add('destroy', bName, function (event) {
+                                expect(event.target.isDestroying()).to.equal(true);
+                            });
+                        }
+                    });
+
+                    var B = baustein.register(bName, {
+                        setupEvents: function (add) {
+                            add('click', this.destroy);
+                        }
+                    });
+
+                    var a = new A();
+                    var b = new B();
+                    b.appendTo(a);
+
+                    baustein.handleEvent({
+                        type: 'click',
+                        target: b.el
+                    });
+
+                    expect(b.isDestroyed()).to.equal(true);
+
+                });
+
+                it('should result in onRemove() being called if the component was attached at time of destruction', function (done) {
+
+                    var C = baustein.register(createComponentName(), {
+                        onRemove: done,
+                        onInsert: function () {
+                            this.destroy();
+                        }
+                    });
+
+                    var c = new C();
+                    c.appendTo(document.body);
+                });
+
             });
 
             describe('#render()', function () {
@@ -1283,6 +1328,53 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                 });
 
                 expect(handler.callCount).to.equal(1);
+            });
+
+            it('should not return until the event is handled', function () {
+
+                var markEventAsHandled = sinon.spy(function (event) {
+                    event.hasBeenHandled = true;
+                });
+
+                var childEvent = {};
+                var grandchildEvent = {};
+
+                var Parent = baustein.register(createComponentName(), {
+                    init: function () {
+                        this.setGlobalHandler('foo', markEventAsHandled);
+                        this.setGlobalHandler('bar', markEventAsHandled);
+                    }
+                });
+
+                var Child = baustein.register(createComponentName(), {
+                    setupEvents: function (add) {
+                        add('foo', function () {
+
+                            this.emit('bar', childEvent);
+
+                            // event should have been handled by now
+                            expect(childEvent.hasBeenHandled).to.equal(true);
+                        });
+                    }
+                });
+
+                var Grandchild = baustein.register(createComponentName());
+
+                var parent = new Parent();
+                var child = new Child();
+                var grandchild = new Grandchild();
+
+                grandchild.appendTo(child);
+                child.appendTo(parent);
+
+                grandchild.emit('foo', grandchildEvent);
+
+                // the event should have bee handled by now
+                expect(grandchildEvent.hasBeenHandled).to.equal(true);
+
+                expect(markEventAsHandled.getCall(0).args[0]).to.equal(grandchildEvent);
+                expect(markEventAsHandled.getCall(1).args[0]).to.equal(childEvent);
+
             });
 
         });

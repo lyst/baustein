@@ -233,10 +233,14 @@ function matches (el, selector) {
 
 /**
  * Returns the nearest Component instance for the passed element.
- * @param {HTMLElement} element
+ * @param {HTMLElement|Component} element
  * @returns {Component[]}
  */
 function parentComponents(element) {
+
+    if (isComponent(element)) {
+        element = element.el;
+    }
 
     var id;
     var result = [];
@@ -382,144 +386,143 @@ function ensureEventHasMethod(event, method, property) {
 }
 
 /**
+ * When `handleEvent` receives an event it adds a "job" to this queue. A job is an array with 3
+ * elements, which map to the arguments expected by `processEventJob`.
+ * @type {Array}
+ */
+var handleEventQueue = [];
+
+/**
  * Handles all events - both standard DOM events and custom Component events.
  *
- * Finds all component instances that contain the 'target' and if they have an event
- * handler for this event it is called. Components closer to the target are called first.
+ * Finds all component instances that contain the 'target' and adds a job to the `handleEventsQueue` for each one.
  *
  * If the event is a DOM event then the event target is the 'target' property of the event.
  * If the event is a custom Component event then the target is the component that emitted the event.
  *
  * @param {Event} event
- * @param {Component[]} [componentsChain] Only used internally when a chain of
- *                                        Components is already available.
+ * @param {Component[]} [componentsChain] Only used internally when a chain of Components is
+ *                                        already available.
  */
 export function handleEvent(event, componentsChain) {
-
-    if (handlingEvent) {
-        pendingEvents.push(arguments);
-        return;
-    }
-
-    handlingEvent = true;
 
     ensureEventHasMethod(event, 'stopPropagation', 'propagationStopped');
     ensureEventHasMethod(event, 'preventDefault', 'defaultPrevented');
 
-    // this will be a DOM element or a Component
-    // component event objects are created in Component.prototype.emit
-    var target = event.target;
-
-    // we need to know if the target is a DOM element or a component instance
-    var targetIsComponent = isComponent(target);
-
-    // if it is a component instance we need the name
-    var targetComponentName = targetIsComponent ? target.name : null;
-
-    // this will be the name of the event
-    var eventName = event.type;
-
-    var component, events, closest, selector;
-    var eventType, method, handlers, i, j, length, eventsLength;
-
-    // We now need to make sure we have the chain of components above the target,
-    // There are three cases here:
-    // 1. We already have a component chain (internal use)
-    // 2. The target is a component, in which case we get the element from the 'el' property
-    // 3. The target is a DOM element
-    // The second argument passed to parentComponents tells it whether or not to include
-    // in the returned array the Component instance attached to the root element. If this is
-    // a component triggered event we do not want to try and find a handler on the same instance.
+    // if a components chain wasn't passed generate it from the target
     if (!componentsChain) {
-        componentsChain = parentComponents(
-            targetIsComponent ? target.el : target
-        );
+        componentsChain = parentComponents(event.target);
     }
 
-    for (i = 0, length = componentsChain.length; i < length; i++) {
+    // push a job to the queue for each component
+    componentsChain.forEach(function (c) {
+        handleEventQueue.push([event, c, false]);
+    });
 
-        if (event.propagationStopped) {
-            break;
+    // push a global job
+    handleEventQueue.push([event, null, true]);
+
+    // consume all the jobs on the queue
+    while (handleEventQueue.length) {
+
+        var job = handleEventQueue.shift();
+
+        if (job[2]) {
+            processEventForGlobalHandlers(job[0]);
         }
-
-        component = componentsChain[i];
-
-        // We definitely don't want to handle events for destroyed elements.
-        if (component._state === STATE_DESTROYED) {
-            throw new Error('Trying to handle event on a destroyed component!');
+        else {
+            processEventForComponent(job[0], job[1]);
         }
+    }
 
-        events = component._events;
+}
 
-        // if component has no events continue to next component
-        if (!events) {
+/**
+ * @param {Event} event A DOM event or a custom component event.
+ * @param {Component} component The component to process this event for.
+ */
+function processEventForComponent(event, component) {
+
+    var events, closest, selector;
+    var eventType, method, i, eventsLength;
+
+    var target = event.target;
+
+    // We definitely don't want to handle events for destroyed elements.
+    if (component._state === STATE_DESTROYED) {
+        return;
+    }
+
+    events = component._events;
+
+    // if component has no events then nothing to do
+    if (!events) {
+        return;
+    }
+
+    for (i = 0, eventsLength = events.length; i < eventsLength; i++) {
+
+        eventType = events[i][0];
+        selector = events[i][1];
+        method = events[i][2];
+
+        // if event doesn't match then go to next component
+        if (eventType !== event.type) {
             continue;
         }
 
-        for (j = 0, eventsLength = events.length; j < eventsLength; j++) {
+        // if there is no selector just invoke the handler and move on
+        if (!selector) {
+            method.call(component, event);
+            continue;
+        }
 
-            eventType = events[j][0];
-            selector = events[j][1];
-            method = events[j][2];
+        // if this is a component event then the
+        // selector just needs to match the component name
+        if (isComponent(target)) {
 
-            // if event doesn't match then go to next component
-            if (eventType !== eventName) {
-                continue;
-            }
-
-            // if there is no selector just invoke the handler and move on
-            if (!selector) {
+            // if component name matches call the handler
+            if (selector === target.name) {
                 method.call(component, event);
-                continue;
             }
 
-            // if this is a component event then the
-            // selector just needs to match the component name
-            if (targetIsComponent) {
+        }
+        else {
 
-                // if component name matches call the handler
-                if (selector === targetComponentName) {
-                    method.call(component, event);
-                }
+            // see if the selector matches the event target
+            closest = closestElement(target, selector);
 
-            }
-            else {
-
-                // see if the selector matches the event target
-                closest = closestElement(target, selector);
-
-                // if it does then call the handler passing the matched element
-                if (closest) {
-                    method.call(component, event, closest);
-                }
-
+            // if it does then call the handler passing the matched element
+            if (closest) {
+                method.call(component, event, closest);
             }
 
         }
 
     }
 
-    if (!event.propagationStopped) {
-        // Now all component events have been handled we need to handle 'global'
-        // events that have been subscribed to using 'setGlobalHandler'.
-        // This is supported for components that need to listen to events on the body/document/window.
-        handlers = globalHandlers[eventName];
-
-        // call the global handlers
-        if (handlers) {
-            for (i = 0, length = handlers.length; i < length; i++) {
-                handlers[i].fn.call(handlers[i].ctx, event, doc.body);
-            }
+    // if this component stopped propogation then remove all queued actions for this event
+    if (event.propagationStopped) {
+        while (handleEventQueue.length && handleEventQueue[0][0] === event) {
+            handleEventQueue.shift();
         }
     }
 
-    // we are no longer handling this event
-    handlingEvent = false;
+}
 
-    // if there are pending events handle the next one
-    if (pendingEvents.length) {
-        var args = pendingEvents.shift();
-        handleEvent.apply(null, args);
+/**
+ * Process an event for all global handlers registered with 'setGlobalHandler'.
+ * This is supported for components that need to listen to events on the body/document/window.
+ * @param {Event} event A DOM event or a custom component event.
+ */
+function processEventForGlobalHandlers(event) {
+    var handlers = globalHandlers[event.type];
+
+    // call the global handlers
+    if (handlers) {
+        for (var i = 0, length = handlers.length; i < length; i++) {
+            handlers[i].fn.call(handlers[i].ctx, event, doc.body);
+        }
     }
 }
 
@@ -834,7 +837,8 @@ export function destroy(name) {
 
 var STATE_DETACHED = 1;
 var STATE_ATTACHED = 2;
-var STATE_DESTROYED = 3;
+var STATE_DESTROYING = 3;
+var STATE_DESTROYED = 4;
 
 /**
  * Creates a new Component
@@ -1026,13 +1030,19 @@ Component.prototype = {
      */
     remove: function () {
 
-        // cannot be removed if no element or no parent element
+        // Cannot be removed if no element or no parent element
         if (!this.el || !this.el.parentElement) {
             return this;
         }
 
-        // actually remove the element
         this.el.parentElement.removeChild(this.el);
+
+        // If the component is currently destroying itself it is better to call onRemove() manually
+        // here rather than wait for the mutation event to pick it up. This is because there is a
+        // race condition where the state is set to destroyed before the mutation event fires.
+        if (this.isDestroying()) {
+            this.onRemove();
+        }
 
         return this;
     },
@@ -1050,42 +1060,37 @@ Component.prototype = {
      */
     destroy: function () {
 
-        var chain;
-
-        // must have already been destroyed
-        if (!componentInstances[this._id]) {
+        // Check that this component has not already been destroyed or is currently being destroyed.
+        if (!componentInstances[this._id] || this.isDestroying()) {
             return null;
         }
 
-        // get the parent chain of Components
-        chain = parentComponents(this.el);
+        this._state = STATE_DESTROYING;
 
-        // invoke destroy on all child Components
+        // Get the parent chain of Components
+        var chain = parentComponents(this.el);
+
+        // Invoke destroy on all child Components
         invoke(parse(this.el, true), 'destroy');
 
-        // make sure this component is removed
+        // Make sure this component is removed
         this.remove();
+
+        this.releaseAllGlobalHandlers();
 
         // emit the destroy event passing the chain (as now the component is detached
         this.emit('destroy', null, chain);
 
-        // remove the reference to the element and the dom wrapper
+        // We are now destroyed!
+        this._state = STATE_DESTROYED;
+
+        // Remove the reference to the element and the dom wrapper
         this.el = null;
         this.$el = null;
 
-        // update the state
-        this._state = STATE_DESTROYED;
-
-        // use null assignment instead of delete
-        // as delete has performance implications
+        // Remove the reference to this component instance. Using a null assignment instead of
+        // delete as delete has performance implications
         componentInstances[this._id] = null;
-
-        // remove any global handlers
-        Object.keys(globalHandlers).forEach(function (event) {
-            globalHandlers[event] = globalHandlers[event].filter(function (handler) {
-                return handler.ctx !== this;
-            }.bind(this));
-        }.bind(this));
 
         return null;
     },
@@ -1247,6 +1252,47 @@ Component.prototype = {
         });
 
         return this;
+    },
+
+    /**
+     * Releases all global handles that this component has registered using `setGlobalHandler`.
+     */
+    releaseAllGlobalHandlers: function () {
+        Object.keys(globalHandlers).forEach(function (event) {
+
+            globalHandlers[event] = globalHandlers[event].filter(function (handler) {
+                return handler.ctx !== this;
+            }.bind(this));
+
+        }.bind(this));
+    },
+
+    /**
+     * @returns {boolean} true if the component is currently destroying itself.
+     */
+    isDestroying: function () {
+        return this._state === STATE_DESTROYING;
+    },
+
+    /**
+     * @returns {boolean} true if the component has been destroyed.
+     */
+    isDestroyed: function () {
+        return this._state == STATE_DESTROYED;
+    },
+
+    /**
+     * @returns {boolean} true if the component is attached to the DOM.
+     */
+    isAttached: function () {
+        return this._state == STATE_ATTACHED;
+    },
+
+    /**
+     * @returns {boolean} true if the component is detached from the DOM.
+     */
+    isDetached: function () {
+        return this._state == STATE_DETACHED;
     }
 
 };
