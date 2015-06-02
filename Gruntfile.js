@@ -84,6 +84,10 @@ module.exports = function (grunt) {
                                 type: 'text-summary',
                                 subdir: '.',
                                 file: 'text-summary.txt'
+                            },
+                            {
+                                type: 'html',
+                                dir: 'coverage'
                             }
                         ]
                     }
