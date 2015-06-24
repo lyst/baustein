@@ -958,7 +958,7 @@ Component.prototype = {
             throw new Error('A component template must produce a single DOM node.');
         }
 
-        newElement = tmpEl.firstElementChild;
+        newElement = tmpEl.removeChild(tmpEl.firstElementChild);
         tmpEl.innerHTML = '';
 
         if (newElement.tagName !== this.el.tagName) {
