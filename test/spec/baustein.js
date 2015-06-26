@@ -82,18 +82,10 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                 expect(new Component(el).el).to.equal(el);
             });
 
-            it('should allocate each instance a unique id', function () {
-                var component1 = new Component();
-                var component2 = new Component();
-                var component3 = new Component();
-                expect(component2._id).to.equal(component1._id + 1);
-                expect(component3._id).to.equal(component2._id + 1);
-            });
-
             it('should set the id as an attribute on the root element', function () {
                 var el = document.createElement('div');
                 var component = new Component(el);
-                expect(el.getAttribute('data-component-id')).to.eql(component._id);
+                expect(el.hasAttribute('data-component-id')).to.eql(true);
             });
 
             it('should set the name as an attribute on the root element', function () {
@@ -415,6 +407,22 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     });
                 });
 
+                it('should throw an error if the root node output by the template does not match the root node of the component', function () {
+
+                    function factory() {
+                        var C = baustein.register(createComponentName(), {
+                            tagName: 'div',
+                            template: function () {
+                                return '<p></p>'
+                            }
+                        });
+                        return new C();
+                    }
+
+                    expect(factory).to.throwError('Cannot change the tagName of an element.');
+
+                });
+
                 it('should invoke the function passing "this" as the first argument', function () {
 
                     var C = baustein.register(createComponentName(), {
@@ -734,30 +742,51 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                 });
 
                 it('should stop handling the event if stopPropagation() is called', function () {
-                    var spy = sinon.spy(function (event) {
-                        if (this.options.callStopPropagation) {
-                            event.stopPropagation();
-                        }
-                    });
 
-                    var Component = baustein.register(createComponentName(), {
+                    var log = [];
+
+                    function createHandler(n) {
+                        return function () {
+                            log.push(n);
+                        };
+                    }
+
+                    var Parent = baustein.register(createComponentName(), {
                         setupEvents: function (add) {
-                            add('foo', spy);
-                        }
+                            add('firstEvent', this.onFirstEvent);
+                            add('secondEvent', this.onSecondEvent);
+                        },
+                        onFirstEvent: function () {
+                            expect().fail('Handler should not be called as propagation was stopped.');
+                        },
+                        onSecondEvent: createHandler(3)
                     });
 
-                    var parent = new Component();
-                    var child = new Component({callStopPropagation: true});
-                    var grandchild = new Component();
+                    var Child = baustein.register(createComponentName(), {
+                        setupEvents: function (add) {
+                            add('firstEvent', this.onFirstEvent);
+                            add('secondEvent', this.onSecondEvent);
+                        },
+                        onFirstEvent: sinon.spy(function (event) {
+                            log.push(1);
+                            event.stopPropagation();
+                            event.target.emit('secondEvent');
+                        }),
+                        onSecondEvent: createHandler(2)
+                    });
 
-                    child.appendTo(parent);
+                    var Grandchild = baustein.register(createComponentName());
+
+                    var parent = new Parent();
+                    var child = new Child();
+                    var grandchild = new Grandchild();
+
                     grandchild.appendTo(child);
+                    child.appendTo(parent);
 
-                    grandchild.emit('foo');
+                    grandchild.emit('firstEvent');
 
-                    expect(spy.callCount).to.equal(2);
-                    expect(spy.getCall(0).thisValue).to.equal(grandchild);
-                    expect(spy.getCall(1).thisValue).to.equal(child);
+                    expect(log).to.eql([1, 2, 3]);
                 });
 
             });
@@ -958,23 +987,27 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
             describe('#registerEvent(event, selector, handler)', function () {
 
-                it('should add an entry to the _events array', function () {
+                it('should add a listener for the event', function () {
 
                     var Component1 = baustein.register(createComponentName());
 
                     var c = new Component1();
 
-                    expect(c._events).to.have.length(0);
-
-                    var handler = function () {
-                    };
+                    var handler = sinon.spy();
                     c.registerEvent('click', handler);
                     c.registerEvent('click', '.some-selector', handler);
 
-                    expect(c._events).to.have.length(2);
+                    var el = document.createElement('div');
+                    el.className = 'some-selector';
 
-                    expect(c._events[0]).to.eql(['click', null, handler]);
-                    expect(c._events[1]).to.eql(['click', '.some-selector', handler]);
+                    c.el.appendChild(el);
+
+                    baustein.handleEvent({
+                        type: 'click',
+                        target: el
+                    });
+
+                    expect(handler.callCount).to.equal(2);
 
                 });
 
@@ -1018,85 +1051,108 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     var NewComponent = baustein.register(createComponentName());
                     var c = new NewComponent();
 
-                    var handler = function () {
-                    };
-                    var handler2 = function () {
-                        return false;
-                    };
+                    var handler = sinon.spy();
+                    var handler2 = sinon.spy();
                     c.registerEvent('click', '.dom', handler);
                     c.registerEvent('click', '.dom', handler2);
                     c.registerEvent('click', handler);
 
-                    expect(c._events).to.have.length(3);
+                    var el = document.createElement('div');
+                    el.className = 'dom';
+
+                    c.el.appendChild(el);
+
+                    baustein.handleEvent({
+                        type: 'click',
+                        target: el
+                    });
+
+                    expect(handler.callCount).to.equal(2);
+                    expect(handler2.callCount).to.equal(1);
+
                     c.releaseEvent('click', '.dom', handler);
-                    expect(c._events).to.have.length(2);
+
+                    baustein.handleEvent({
+                        type: 'click',
+                        target: el
+                    });
+
+                    expect(handler.callCount).to.equal(3);
+                    expect(handler2.callCount).to.equal(2);
                 });
+
+            });
+
+            describe('#releaseEvent(event, selector)', function () {
 
                 it('given an event, selector, remove all events for that selector', function () {
                     var NewComponent = baustein.register(createComponentName());
                     var c = new NewComponent();
 
-                    var handler = function () {
-                    };
-                    var handler2 = function () {
-                        return true;
-                    };
+                    var handler = sinon.spy();
+                    var handler2 = sinon.spy();
                     c.registerEvent('click', '.dom', handler);
                     c.registerEvent('click', '.dom', handler2);
                     c.registerEvent('click', handler);
 
                     c.releaseEvent('click', '.dom');
-                    expect(c._events).to.have.length(1);
+
+                    baustein.handleEvent({
+                        type: 'click',
+                        target: c.el
+                    });
+
+                    expect(handler.callCount).to.equal(1);
+                    expect(handler2.callCount).to.equal(0);
                 });
+
+            });
+
+            describe('#releaseEvent(event, handler)', function () {
+
+                it('given an event, selector, remove all events for that selector', function () {
+                    var NewComponent = baustein.register(createComponentName());
+                    var c = new NewComponent();
+
+                    var handler = sinon.spy();
+                    c.registerEvent('click', handler);
+                    c.releaseEvent('click', handler);
+
+                    baustein.handleEvent({
+                        type: 'click',
+                        target: c.el
+                    });
+
+                    expect(handler.callCount).to.equal(0);
+                });
+
+            });
+
+            describe('#releaseEvent(event)', function () {
 
                 it('given an event, remove all events from the component only', function () {
                     var NewComponent = baustein.register(createComponentName());
                     var c = new NewComponent();
 
-                    var handler = function () {
-                    };
-                    var handler2 = function () {
-                        return true;
-                    };
-                    c.registerEvent('click', '.dom', handler);
-                    c.registerEvent('click', '.dom', handler2);
-                    c.registerEvent('click', handler);
+                    var handler = sinon.spy();
+                    var handler2 = sinon.spy();
 
-                    c.releaseEvent('click');
-                    expect(c._events).to.have.length(2);
+                    var target = document.createElement('div');
+                    target.className = 'dom';
 
                     c.registerEvent('click', handler);
                     c.registerEvent('click', handler2);
                     c.releaseEvent('click');
-                    expect(c._events).to.have.length(2);
+
+                    baustein.handleEvent({
+                        type: 'click',
+                        target: target
+                    });
+
+                    expect(handler.callCount).to.equal(0);
+                    expect(handler2.callCount).to.equal(0);
                 });
 
-                it('should not remove unspecified events', function () {
-                    var NewComponent = baustein.register(createComponentName());
-                    var c = new NewComponent();
-
-                    var handler = function () {
-                    };
-                    var handler2 = function () {
-                        return true;
-                    };
-
-                    c.registerEvent('click', '.dom', handler);
-                    c.registerEvent('click', '.dom', handler2);
-                    c.registerEvent('hover', handler);
-
-                    c.releaseEvent('hover', handler2);
-                    expect(c._events).to.have.length(3);
-
-                    c.releaseEvent('click');
-                    expect(c._events).to.have.length(3);
-
-                    c.releaseEvent('mouseout', '.dom', handler);
-                    expect(c._events).to.have.length(3);
-
-                    c.releaseEvent('mouseout', '.dom');
-                    expect(c._events).to.have.length(3);
-                });
             });
 
             describe('#releaseGlobalHandler', function () {
