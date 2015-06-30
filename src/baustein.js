@@ -374,6 +374,61 @@ function parseAttributes(el) {
 }
 
 /**
+ * Returns true is objA and objB are equal.
+ * @param {*} objA
+ * @param {*} objB
+ * @returns {boolean}
+ */
+function equals(objA, objB) {
+    var typeA;
+    var keysA;
+    var i;
+
+    if (objA === objB) {
+        return true;
+    }
+
+    typeA = type(objA);
+
+    if (typeA !== type(objB)) {
+        return false;
+    }
+
+    if (typeA === 'array') {
+
+        if (objA.length !== objB.length) {
+            return false;
+        }
+
+        for (i = 0; i < objA.length; i++) {
+            if (!equals(objA[i], objB[i])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    if (isObject(objA)) {
+        keysA = keys(objA);
+
+        if (keysA.length !== keys(objB).length) {
+            return false;
+        }
+
+        for (i = 0; i < keysA.length; i++) {
+            if (!equals(objA[keysA[i]], objB[keysA[i]])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+/**
  * Returns true if component is an instance of Component.
  * @param component
  * @returns {boolean}
@@ -1003,6 +1058,36 @@ Component[prototype] = {
     getRenderContext: function () {
         return this;
     },
+
+    /**
+     * Updates this components options. If calling this method results in the options changing then
+     * `onOptionsChanged` will be called.
+     * @param options
+     */
+    updateOptions: function (options) {
+
+        var changed = false;
+        var optionKeys = keys(options);
+        var key, i;
+
+        for (i = 0, key = optionKeys[i]; i < optionKeys.length; i++) {
+            if (!equals(this.options[key], options[key])) {
+                changed = true;
+                this.options[key] = options[key];
+            }
+        }
+
+        if (changed) {
+            this.onOptionsChange();
+        }
+
+        return this;
+    },
+
+    /**
+     * Called when options are changed via a call to `updateOptions`.
+     */
+    onOptionsChange: noop,
 
     /**
      * Emits an event that parent Components can listen to.

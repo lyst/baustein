@@ -1389,6 +1389,66 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
         });
 
+        describe('#updateOptions(options)', function () {
+
+            it('should update the options on the component', function () {
+                var C = baustein.register(createComponentName());
+                var c = new C({
+                    foo: 'bar'
+                });
+                c.updateOptions({
+                    foo: 'baz'
+                });
+                expect(c.options).to.eql({
+                    foo: 'baz'
+                });
+            });
+
+            [
+                [{foo: ['bar']}, {foo: ['baz']}],
+                [{foo: ['bar']}, {foo: ['baz', 'bar']}],
+                [{foo: {key: 'value'}}, {foo: {key: 'new value'}}],
+                [{foo: null}, {foo: 0}],
+                [{foo: {key: 'value'}}, {foo: {key: 'value', otherKey: 'other value'}}]
+            ].forEach(function (arr, i) {
+                var initial = arr[0];
+                var update = arr[1];
+
+                it('should call onOptionsChange() if an option changes - ' + (i + 1), function () {
+                    var spy = sinon.spy();
+                    var C = baustein.register(createComponentName(), {
+                        onOptionsChange: spy
+                    });
+                    var c = new C(initial);
+                    c.updateOptions(update);
+                    expect(spy.callCount).to.equal(1);
+                });
+
+            });
+
+            [
+                [{foo: ['bar']}, {foo: ['bar']}],
+                [{foo: 1}, {foo: 1}],
+                [{foo: {key: 'value'}}, {foo: {key: 'value'}}],
+                [{foo: null}, {foo: null}]
+            ].forEach(function (arr, i) {
+                var initial = arr[0];
+                var update = arr[1];
+
+                it('should not call onOptionsChange() if no option changes - ' + (i + 1), function () {
+                    var spy = sinon.spy();
+                    var C = baustein.register(createComponentName(), {
+                        onOptionsChange: spy
+                    });
+                    var c = new C(initial);
+                    c.updateOptions(update);
+                    expect(spy.callCount).to.equal(0);
+                });
+
+            });
+
+        });
+
         describe('baustein.handleEvent(event)', function () {
 
             it('should invoke the correct method on the correct component', function () {
