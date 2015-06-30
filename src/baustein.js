@@ -1,12 +1,31 @@
 if (typeof window === 'undefined') {
-    throw new Error('components requires an environment with a window');
+    throw Error('components requires an environment with a window');
 }
 
 var win = window;
 var doc = win.document;
+var Obj = Object;
 var slice = [].slice;
-var filter = [].filter;
-var map = [].map;
+
+// these variables help minification
+var parentElement = 'parentElement';
+var filter = 'filter';
+var push = 'push';
+var forEach = 'forEach';
+var attributes = 'attributes';
+var lengthKey = 'length';
+var prototype = 'prototype';
+var call = 'call';
+var apply = 'apply';
+var DOMNodeInserted = 'DOMNodeInserted';
+var DOMNodeRemoved = 'DOMNodeRemoved';
+
+// keys used as private variables on Component instance
+var privateSuffix = Math.random();
+var stateKey = '_state' + privateSuffix;
+var eventsKey = '_events' + privateSuffix;
+var idKey = '_key' + privateSuffix;
+
 var observer;
 
 /**
@@ -84,7 +103,11 @@ var allEvents = {
  * @returns {String}
  */
 function type (obj) {
-    return Object.prototype.toString.call(obj).match(/\[object (.*?)\]/)[1].toLowerCase();
+    return Obj[prototype].toString[call](obj).match(/\[object (.*?)\]/)[1].toLowerCase();
+}
+
+function keys(obj) {
+    return Obj.keys(obj);
 }
 
 /**
@@ -157,7 +180,7 @@ function defaultDOMQuery(el, selector) {
  * @returns {Array}
  */
 function defaultDOMWrapper(arr) {
-    return arr && arr.length ? slice.call(arr) : [];
+    return arr && arr[lengthKey] ? slice[call](arr) : [];
 }
 
 /**
@@ -167,7 +190,7 @@ function defaultDOMWrapper(arr) {
  */
 function extend (target) {
 
-    slice.call(arguments, 1).forEach(function (source) {
+    slice[call](arguments, 1)[forEach](function (source) {
         if (isObject(source)) {
             for (var key in source) {
                 if (source.hasOwnProperty(key)) {
@@ -194,14 +217,14 @@ function closestElement (el, selector) {
             return el;
         }
 
-        el = el.parentElement;
+        el = el[parentElement];
     }
 
     return null;
 }
 
 /**
- * Wrapper around the HTMLElement.prototype.matches
+ * Wrapper around the HTMLElement[prototype].matches
  * method to support vendor prefixed versions.
  * @param {HTMLElement} el
  * @param {String} selector
@@ -217,7 +240,7 @@ function matches (el, selector) {
         el.matchesSelector ||
         el.matches;
 
-    return matchesSelector.call(el, selector);
+    return matchesSelector[call](el, selector);
 }
 
 /**
@@ -244,10 +267,10 @@ function parentComponents(element) {
         id = element.getAttribute(dataComponentIdAttribute);
 
         if (id && componentInstances[id]) {
-            result.push(componentInstances[id]);
+            result[push](componentInstances[id]);
         }
 
-        element = element.parentElement;
+        element = element[parentElement];
     }
 
     return result;
@@ -297,9 +320,9 @@ export function fromElement(el) {
  */
 function invoke(components, method) {
 
-    var args = slice.call(arguments, 2);
+    var args = slice[call](arguments, 2);
     var i = 0;
-    var length;
+    var componentsLength;
 
     if (isComponent(components)) {
         components = [components];
@@ -309,9 +332,9 @@ function invoke(components, method) {
         return this;
     }
 
-    for (length = components.length; i < length; i++) {
+    for (componentsLength = components[lengthKey]; i < componentsLength; i++) {
         if (isFunction(components[i][method])) {
-            components[i][method].apply(components[i], args);
+            components[i][method][apply](components[i], args);
         }
     }
 
@@ -332,10 +355,10 @@ function parseAttributes(el) {
     var name;
     var value;
 
-    for (var i = 0; i < el.attributes.length; i++) {
+    for (var i = 0; i < el[attributes][lengthKey]; i++) {
 
-        name = toCamelCase(el.attributes[i].name);
-        value = el.attributes[i].value;
+        name = toCamelCase(el[attributes][i].name);
+        value = el[attributes][i].value;
 
         try {
             value = JSON.parse(value);
@@ -369,7 +392,7 @@ function ensureEventHasMethod(event, method, property) {
     event[method] = function () {
         event[property] = true;
         if (originalMethod) {
-            return originalMethod.apply(event, arguments);
+            return originalMethod[apply](event, arguments);
         }
     };
 }
@@ -380,6 +403,10 @@ function ensureEventHasMethod(event, method, property) {
  * @type {Array}
  */
 var handleEventQueue = [];
+
+var EVENT_JOB_METHOD_INDEX = 0;
+var EVENT_JOB_COMPONENT_INDEX = 1;
+var EVENT_JOB_ARGS_INDEX = 2;
 
 /**
  * Handles all events - both standard DOM events and custom Component events.
@@ -396,34 +423,41 @@ export function handleEvent(event) {
     ensureEventHasMethod(event, 'stopPropagation', 'propagationStopped');
     ensureEventHasMethod(event, 'preventDefault', 'defaultPrevented');
 
-    // push a job to the queue for each component
-    parentComponents(event.target).forEach(function (c) {
-        handleEventQueue.push([event, c, false]);
+    // this adds a "job" to the queue for each handler that should be called on each component
+    parentComponents(event.target)[forEach](function (c) {
+        pushEventJobsForComponent(event, c);
     });
 
-    // push a global job
-    handleEventQueue.push([event, null, true]);
+    // this adds a "job" to the queue for each global handler that should be called
+    pushEventJobsForGlobalHandlers(event);
 
-    // consume all the jobs on the queue
-    while (handleEventQueue.length) {
+    while (handleEventQueue[lengthKey]) {
 
+        // get the next job in the queue
         var job = handleEventQueue.shift();
 
-        if (job[2]) {
-            processEventForGlobalHandlers(job[0]);
+        // if this component stopped propagation then remove all queued actions for this event
+        if (job[EVENT_JOB_ARGS_INDEX][0].propagationStopped) {
+            while (handleEventQueue[lengthKey] && handleEventQueue[0][EVENT_JOB_ARGS_INDEX][0] === job[EVENT_JOB_ARGS_INDEX][0]) {
+                handleEventQueue.shift();
+            }
         }
+
+        // else we can can the handler
         else {
-            processEventForComponent(job[0], job[1]);
+            job[EVENT_JOB_METHOD_INDEX][apply](job[EVENT_JOB_COMPONENT_INDEX], job[EVENT_JOB_ARGS_INDEX]);
         }
+
     }
 
 }
 
 /**
+ * Pushes a "job" to the queue for each event handler `component` has for `event`.
  * @param {Event} event A DOM event or a custom component event.
- * @param {Component} component The component to process this event for.
+ * @param {Component} component
  */
-function processEventForComponent(event, component) {
+function pushEventJobsForComponent(event, component) {
 
     var events, closest, selector;
     var eventType, method, i, eventsLength;
@@ -431,13 +465,13 @@ function processEventForComponent(event, component) {
     var target = event.target;
 
     // We definitely don't want to handle events for destroyed elements.
-    if (component._state === STATE_DESTROYED) {
+    if (component[stateKey] === STATE_DESTROYED) {
         return;
     }
 
-    events = component._events;
+    events = component[eventsKey];
 
-    for (i = 0, eventsLength = events.length; i < eventsLength; i++) {
+    for (i = 0, eventsLength = events[lengthKey]; i < eventsLength; i++) {
 
         eventType = events[i][0];
         selector = events[i][1];
@@ -450,7 +484,7 @@ function processEventForComponent(event, component) {
 
         // if there is no selector just invoke the handler and move on
         if (!selector) {
-            method.call(component, event);
+            handleEventQueue[push]([method, component, [event]]);
             continue;
         }
 
@@ -460,7 +494,7 @@ function processEventForComponent(event, component) {
 
             // if component name matches call the handler
             if (selector === target.name) {
-                method.call(component, event);
+                handleEventQueue[push]([method, component, [event]]);
             }
 
         }
@@ -471,34 +505,26 @@ function processEventForComponent(event, component) {
 
             // if it does then call the handler passing the matched element
             if (closest) {
-                method.call(component, event, closest);
+                handleEventQueue[push]([method, component, [event, closest]]);
             }
 
         }
 
     }
 
-    // if this component stopped propogation then remove all queued actions for this event
-    if (event.propagationStopped) {
-        while (handleEventQueue.length && handleEventQueue[0][0] === event) {
-            handleEventQueue.shift();
-        }
-    }
-
 }
 
 /**
- * Process an event for all global handlers registered with 'setGlobalHandler'.
+ * Pushes a "job" to the queue for each global event handler registered for `event`.
  * This is supported for components that need to listen to events on the body/document/window.
  * @param {Event} event A DOM event or a custom component event.
  */
-function processEventForGlobalHandlers(event) {
+function pushEventJobsForGlobalHandlers(event) {
     var handlers = globalHandlers[event.type];
 
-    // call the global handlers
     if (handlers) {
-        for (var i = 0, length = handlers.length; i < length; i++) {
-            handlers[i].fn.call(handlers[i].ctx, event, doc.body);
+        for (var i = 0, handlersLength = handlers[lengthKey]; i < handlersLength; i++) {
+            handleEventQueue[push]([handlers[i].fn, handlers[i].ctx, [event, doc.body]]);
         }
     }
 }
@@ -511,14 +537,14 @@ function processEventForGlobalHandlers(event) {
  */
 export function parse(node, ignoreRootNode) {
 
-    if (arguments.length === 0) {
+    if (arguments[lengthKey] === 0) {
         node = doc.body;
     }
     else if (!isElement(node)) {
-        throw new Error('node must be an HTMLElement');
+        throw Error('node must be an HTMLElement');
     }
 
-    var els = slice.call(node.querySelectorAll('[is]'));
+    var els = slice[call](node.querySelectorAll('[is]'));
     var component;
 
     // if it's not being ignored add the root element to the front
@@ -530,8 +556,8 @@ export function parse(node, ignoreRootNode) {
 
         component = fromElement(el);
 
-        if (component && component._state !== STATE_DESTROYED) {
-            result.push(component);
+        if (component && component[stateKey] !== STATE_DESTROYED) {
+            result[push](component);
         }
 
         return result;
@@ -558,20 +584,20 @@ export function register(name, impl) {
     impl = impl || {};
 
     function F() {
-        Component.apply(this, arguments);
+        Component[apply](this, arguments);
     }
 
-    F.prototype = Object.create(Component.prototype);
-    F.prototype.name = name;
+    F[prototype] = Obj.create(Component[prototype]);
+    F[prototype].name = name;
 
-    var impls = slice.call(impl.mixins || []);
-    impls.push(impl);
+    var impls = slice[call](impl.mixins || []);
+    impls[push](impl);
 
-    impls.forEach(function (impl) {
-        Object.keys(impl).forEach(function (key) {
+    impls[forEach](function (impl) {
+        keys(impl)[forEach](function (key) {
 
-            var descriptor = Object.getOwnPropertyDescriptor(impl, key);
-            var existing = Object.getOwnPropertyDescriptor(F.prototype, key);
+            var descriptor = Obj.getOwnPropertyDescriptor(impl, key);
+            var existing = Obj.getOwnPropertyDescriptor(F[prototype], key);
 
             if (isFunction(descriptor.value) && existing && isFunction(existing.value)) {
 
@@ -581,13 +607,13 @@ export function register(name, impl) {
                 // override the value of the descriptor to call
                 // both the original function and the new one
                 descriptor.value = function () {
-                    existing.value.apply(this, arguments);
-                    return method.apply(this, arguments);
+                    existing.value[apply](this, arguments);
+                    return method[apply](this, arguments);
                 };
             }
 
             // define the new property
-            Object.defineProperty(F.prototype, key, descriptor);
+            Obj.defineProperty(F[prototype], key, descriptor);
         });
 
     });
@@ -615,7 +641,7 @@ function eventManager(method) {
     for (key in allEvents) {
 
         // special case for resize and scroll event to listen on window
-        el = ['resize', 'scroll', 'orientationchange'].indexOf(key) !== -1 ? window : doc.body;
+        el = ['resize', 'scroll', 'orientationchange'].indexOf(key) !== -1 ? win : doc.body;
 
         el[method](key, handleEvent, !!allEvents[key]);
     }
@@ -627,10 +653,10 @@ function eventManager(method) {
  */
 function mutationEventHandler(event) {
     switch (event.type) {
-        case 'DOMNodeInserted':
+        case DOMNodeInserted:
             nodeInserted(event.target);
             break;
-        case 'DOMNodeRemoved':
+        case DOMNodeRemoved:
             nodeRemoved(event.target);
             break;
     }
@@ -645,13 +671,13 @@ export function bindEvents() {
     // use MutationObserver if available
     if (win.MutationObserver) {
         observer = new MutationObserver(function (records) {
-            slice.call(records).forEach(function (record) {
-                slice.call(record.removedNodes).forEach(nodeRemoved);
-                slice.call(record.addedNodes).forEach(nodeInserted);
+            slice[call](records)[forEach](function (record) {
+                slice[call](record.removedNodes)[forEach](nodeRemoved);
+                slice[call](record.addedNodes)[forEach](nodeInserted);
             });
         });
 
-        observer.observe(document.body, {
+        observer.observe(doc.body, {
             childList: true,
             subtree: true
         });
@@ -659,8 +685,8 @@ export function bindEvents() {
 
     // fallback to mutation events
     else {
-        document.body.addEventListener('DOMNodeInserted', mutationEventHandler, true);
-        document.body.addEventListener('DOMNodeRemoved', mutationEventHandler, true);
+        doc.body.addEventListener(DOMNodeInserted, mutationEventHandler, true);
+        doc.body.addEventListener(DOMNodeRemoved, mutationEventHandler, true);
     }
 }
 
@@ -673,8 +699,8 @@ export function unbindEvents() {
     if (observer) {
         observer.disconnect();
     } else {
-        document.body.removeEventListener('DOMNodeInserted', mutationEventHandler, true);
-        document.body.removeEventListener('DOMNodeRemoved', mutationEventHandler, true);
+        doc.body.removeEventListener(DOMNodeInserted, mutationEventHandler, true);
+        doc.body.removeEventListener(DOMNodeRemoved, mutationEventHandler, true);
     }
 }
 
@@ -688,9 +714,9 @@ function nodeInserted(node) {
 
         // We only want components that think they are detached as IE10 can get a bit trigger
         // happer with firing DOMNodeInserted events.
-        var components = parse(node).filter(function (c) {
-            if (c._state === STATE_DETACHED) {
-                c._state = STATE_ATTACHED;
+        var components = parse(node)[filter](function (c) {
+            if (c[stateKey] === STATE_DETACHED) {
+                c[stateKey] = STATE_ATTACHED;
                 return true;
             }
             return false;
@@ -710,9 +736,9 @@ function nodeRemoved(node) {
 
         // We only want components that think they are attached as IE10 can get a bit trigger
         // happer with firing DOMNodeRemoved events.
-        var components = parse(node).filter(function (c) {
-            if (c._state === STATE_ATTACHED) {
-                c._state = STATE_DETACHED;
+        var components = parse(node)[filter](function (c) {
+            if (c[stateKey] === STATE_ATTACHED) {
+                c[stateKey] = STATE_DETACHED;
                 return true;
             }
             return false;
@@ -790,7 +816,7 @@ export function getInstancesOf(name) {
 
     for (var key in componentInstances) {
         if (componentInstances[key] && componentInstances[key].name === name) {
-            result.push(componentInstances[key]);
+            result[push](componentInstances[key]);
         }
     }
 
@@ -801,7 +827,7 @@ export function getInstancesOf(name) {
  * @param {string} name
  */
 export function destroy(name) {
-    getInstancesOf(name).forEach(function(instance) {
+    getInstancesOf(name)[forEach](function(instance) {
         instance.destroy();
     });
 
@@ -833,17 +859,17 @@ function attributeReducer(result, attr) {
  * @param {HTMLElement} source
  */
 function copyAttributes(target, source) {
-    var targetAttributes = slice.call(target.attributes).reduce(attributeReducer, {});
-    var sourceAttributes = slice.call(source.attributes).reduce(attributeReducer, {});
+    var targetAttributes = slice[call](target[attributes]).reduce(attributeReducer, {});
+    var sourceAttributes = slice[call](source[attributes]).reduce(attributeReducer, {});
 
     // copy all attributes from the source to the target
-    Object.keys(sourceAttributes).forEach(function (attrName) {
+    keys(sourceAttributes)[forEach](function (attrName) {
         target.setAttribute(attrName, sourceAttributes[attrName]);
     });
 
     // remove any attributes (except for data-component-id) from the target that are not
     // present on the source.
-    Object.keys(targetAttributes).forEach(function (attrName) {
+    keys(targetAttributes)[forEach](function (attrName) {
         if (attrName !== dataComponentIdAttribute && !sourceAttributes.hasOwnProperty(attrName)) {
             target.removeAttribute(attrName);
         }
@@ -858,19 +884,19 @@ function copyAttributes(target, source) {
  */
 export function Component (element, options) {
 
-    if (arguments.length === 1 && isObject(element)) {
+    if (arguments[lengthKey] === 1 && isObject(element)) {
         options = element;
         element = this.createRootElement();
     }
 
-    if (!arguments.length) {
+    if (!arguments[lengthKey]) {
         element = this.createRootElement();
     }
 
     // internals
-    this._id = nextComponentId++;
-    this._events = [];
-    this._state = STATE_DETACHED;
+    this[idKey] = nextComponentId++;
+    this[eventsKey] = [];
+    this[stateKey] = STATE_DETACHED;
 
     this.el = element;
 
@@ -893,17 +919,17 @@ export function Component (element, options) {
     }
 
     element.setAttribute('is', this.name);
-    element.setAttribute(dataComponentIdAttribute, this._id);
+    element.setAttribute(dataComponentIdAttribute, this[idKey]);
 
     // store this instance
-    componentInstances[this._id] = this;
+    componentInstances[this[idKey]] = this;
 
     this.init();
     this.setupEvents(this.registerEvent.bind(this));
     this.render();
 }
 
-Component.prototype = {
+Component[prototype] = {
 
     name: '',
 
@@ -950,19 +976,19 @@ Component.prototype = {
             return this;
         }
 
-        html = template.call(this, this.getRenderContext());
+        html = template[call](this, this.getRenderContext());
 
         tmpEl.innerHTML = html;
 
-        if (tmpEl.children.length !== 1) {
-            throw new Error('A component template must produce a single DOM node.');
+        if (tmpEl.children[lengthKey] !== 1) {
+            throw Error('A component template must produce a single DOM node.');
         }
 
         newElement = tmpEl.removeChild(tmpEl.firstElementChild);
         tmpEl.innerHTML = '';
 
         if (newElement.tagName !== this.el.tagName) {
-            throw new Error('Cannot change the tagName of an element.');
+            throw Error('Cannot change the tagName of an element.');
         }
 
         // destroy all children of the target as they are about to be re-rendered
@@ -1007,7 +1033,7 @@ Component.prototype = {
             return this;
         }
 
-        var parent = el.parentElement;
+        var parent = el[parentElement];
         if (parent) {
             parent.insertBefore(this.el, el);
         }
@@ -1067,11 +1093,11 @@ Component.prototype = {
     remove: function () {
 
         // Cannot be removed if no element or no parent element
-        if (!this.el || !this.el.parentElement) {
+        if (!this.el || !this.el[parentElement]) {
             return this;
         }
 
-        this.el.parentElement.removeChild(this.el);
+        this.el[parentElement].removeChild(this.el);
 
         // If the component is currently destroying itself it is better to call onRemove() manually
         // here rather than wait for the mutation event to pick it up. This is because there is a
@@ -1097,11 +1123,11 @@ Component.prototype = {
     destroy: function () {
 
         // Check that this component has not already been destroyed or is currently being destroyed.
-        if (!componentInstances[this._id] || this.isDestroying()) {
+        if (!componentInstances[this[idKey]] || this.isDestroying()) {
             return null;
         }
 
-        this._state = STATE_DESTROYING;
+        this[stateKey] = STATE_DESTROYING;
 
         // invoke destroy on all child Components
         invoke(parse(this.el, true), 'destroy');
@@ -1112,7 +1138,7 @@ Component.prototype = {
         this.releaseAllGlobalHandlers();
 
         // We are now destroyed!
-        this._state = STATE_DESTROYED;
+        this[stateKey] = STATE_DESTROYED;
 
         // Remove the reference to the element and the dom wrapper
         this.el = null;
@@ -1120,7 +1146,7 @@ Component.prototype = {
 
         // Remove the reference to this component instance. Using a null assignment instead of
         // delete as delete has performance implications
-        componentInstances[this._id] = null;
+        componentInstances[this[idKey]] = null;
 
         return null;
     },
@@ -1162,7 +1188,7 @@ Component.prototype = {
      * @returns {Component[]}
      */
     findComponents: function (name) {
-        return map.call(
+        return [].map[call](
             this.find('[is=' + name + ']'),
             fromElement
         );
@@ -1179,17 +1205,17 @@ Component.prototype = {
      */
     registerEvent: function (event, selector, handler) {
 
-        if (arguments.length === 2) {
+        if (arguments[lengthKey] === 2) {
             handler = selector;
             selector = null;
         }
 
-        this._events.push([event, selector, handler]);
+        this[eventsKey][push]([event, selector, handler]);
         return this;
     },
 
     /**
-     * Release an event or all events off an object.
+     * Release an event or all events from this component.
      * @example
      *  releaseEvent('click', '.image-thumbnail, this._onImageThumbnailClick);
      *  // releases the specific click event handler on an object
@@ -1220,7 +1246,7 @@ Component.prototype = {
             selector = null;
         }
 
-        this._events = filter.call(this._events, function(ev) {
+        this[eventsKey] = this[eventsKey][filter](function(ev) {
             var eventName = ev[0];
             var eventSelector = ev[1];
             var eventHandler = ev[2];
@@ -1253,7 +1279,7 @@ Component.prototype = {
 
         globalHandlers[event] = globalHandlers[event] || [];
 
-        globalHandlers[event].push({
+        globalHandlers[event][push]({
             fn: fn,
             ctx: this
         });
@@ -1277,7 +1303,7 @@ Component.prototype = {
         }
 
         // filter out entries with the same function and context
-        globalHandlers[event] = filter.call(handlers, function (handler) {
+        globalHandlers[event] = handlers[filter](function (handler) {
             return handler.fn !== fn || handler.ctx !== ctx;
         });
 
@@ -1288,9 +1314,9 @@ Component.prototype = {
      * Releases all global handles that this component has registered using `setGlobalHandler`.
      */
     releaseAllGlobalHandlers: function () {
-        Object.keys(globalHandlers).forEach(function (event) {
+        keys(globalHandlers)[forEach](function (event) {
 
-            globalHandlers[event] = globalHandlers[event].filter(function (handler) {
+            globalHandlers[event] = globalHandlers[event][filter](function (handler) {
                 return handler.ctx !== this;
             }.bind(this));
 
@@ -1301,28 +1327,28 @@ Component.prototype = {
      * @returns {boolean} true if the component is currently destroying itself.
      */
     isDestroying: function () {
-        return this._state === STATE_DESTROYING;
+        return this[stateKey] === STATE_DESTROYING;
     },
 
     /**
      * @returns {boolean} true if the component has been destroyed.
      */
     isDestroyed: function () {
-        return this._state == STATE_DESTROYED;
+        return this[stateKey] == STATE_DESTROYED;
     },
 
     /**
      * @returns {boolean} true if the component is attached to the DOM.
      */
     isAttached: function () {
-        return this._state == STATE_ATTACHED;
+        return this[stateKey] == STATE_ATTACHED;
     },
 
     /**
      * @returns {boolean} true if the component is detached from the DOM.
      */
     isDetached: function () {
-        return this._state == STATE_DETACHED;
+        return this[stateKey] == STATE_DETACHED;
     }
 
 };
