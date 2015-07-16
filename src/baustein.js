@@ -1070,7 +1070,8 @@ Component[prototype] = {
         var optionKeys = keys(options);
         var key, i;
 
-        for (i = 0, key = optionKeys[i]; i < optionKeys.length; i++) {
+        for (i = 0; i < optionKeys.length; i++) {
+            key = optionKeys[i];
             if (!equals(this.options[key], options[key])) {
                 changed = true;
                 this.options[key] = options[key];
