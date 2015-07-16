@@ -1409,7 +1409,8 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                 [{foo: ['bar']}, {foo: ['baz', 'bar']}],
                 [{foo: {key: 'value'}}, {foo: {key: 'new value'}}],
                 [{foo: null}, {foo: 0}],
-                [{foo: {key: 'value'}}, {foo: {key: 'value', otherKey: 'other value'}}]
+                [{foo: {key: 'value'}}, {foo: {key: 'value', otherKey: 'other value'}}],
+                [{foo: 1, bar: 2}, {foo: 1, bar: 3}]
             ].forEach(function (arr, i) {
                 var initial = arr[0];
                 var update = arr[1];
