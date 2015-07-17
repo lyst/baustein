@@ -25,6 +25,7 @@ var privateSuffix = Math.random();
 var stateKey = '_state' + privateSuffix;
 var eventsKey = '_events' + privateSuffix;
 var idKey = '_key' + privateSuffix;
+var contextKey = '_context' + privateSuffix;
 
 var observer;
 
@@ -426,6 +427,49 @@ function equals(objA, objB) {
     }
 
     return false;
+}
+
+/**
+ * Returns a deep clone of `obj`.
+ * @param {*} obj
+ * @returns {*}
+ */
+function clone(obj) {
+
+    if (isObject(obj)) {
+        return keys(obj).reduce(function (result, key) {
+            result[key] = clone(obj[key]);
+            return result;
+        }, {});
+    }
+
+    if (type(obj) === 'array') {
+        return obj.map(clone);
+    }
+
+    return obj;
+}
+
+/**
+ * Updates objA with objB and returns true if this resulted in any actual changes to objA.
+ * @param objA
+ * @param objB
+ * @returns {boolean}
+ */
+function updateObject(objA, objB) {
+    var changed = false;
+    var contextKeys = keys(objB);
+    var key, i;
+
+    for (i = 0; i < contextKeys.length; i++) {
+        key = contextKeys[i];
+        if (!equals(objA[key], objB[key])) {
+            changed = true;
+            objA[key] = objB[key];
+        }
+    }
+
+    return changed;
 }
 
 /**
@@ -902,7 +946,6 @@ var STATE_DESTROYED = 4;
  * @returns {object}
  */
 function attributeReducer(result, attr) {
-    result = result || {};
     result[attr.name] = attr.value;
     return result;
 }
@@ -939,19 +982,24 @@ function copyAttributes(target, source) {
  */
 export function Component (element, options) {
 
+    var shouldRender = false;
+
     if (arguments[lengthKey] === 1 && isObject(element)) {
         options = element;
         element = this.createRootElement();
+        shouldRender = true;
     }
 
     if (!arguments[lengthKey]) {
         element = this.createRootElement();
+        shouldRender = true;
     }
 
     // internals
     this[idKey] = nextComponentId++;
     this[eventsKey] = [];
     this[stateKey] = STATE_DETACHED;
+    this[contextKey] = {};
 
     this.el = element;
 
@@ -981,7 +1029,13 @@ export function Component (element, options) {
 
     this.init();
     this.setupEvents(this.registerEvent.bind(this));
-    this.render();
+    this[contextKey] = clone(this.getInitialRenderContext());
+
+    // Only render if we created the root element in the constructor function. Otherwise we assume
+    // that the element was already on the page and was already rendered.
+    if (shouldRender) {
+        this.render();
+    }
 }
 
 Component[prototype] = {
@@ -1051,12 +1105,56 @@ Component[prototype] = {
 
         this.el.innerHTML = newElement.innerHTML;
         copyAttributes(this.el, newElement);
+        return this;
+    },
+
+    /**
+     * Sets all the values in `context` into the components render context. If this results in any
+     * changes to the context `render()` will be called.
+     * @param {object} context
+     * @returns {Component}
+     */
+    setRenderContext: function (context) {
+        // we want our own copy of the context so nothing outside can mutate it
+        context = clone(context);
+
+        if (updateObject(this[contextKey], context)) {
+            this.render();
+        }
 
         return this;
     },
 
+    /**
+     * Replaces the current render context with `context`. If this results in a different render
+     * context then `render()` will be called.
+     * @param {object} context
+     */
+    replaceRenderContext: function (context) {
+        // we want our own copy of the context so nothing outside can mutate it
+        context = clone(context);
+
+        // if it is different to the current context then set it and call render()
+        if (!equals(this[contextKey], context)) {
+            this[contextKey] = context;
+            this.render();
+        }
+    },
+
+    /**
+     * Returns a clone of the current render context.
+     * @returns {object}
+     */
     getRenderContext: function () {
-        return this;
+        return clone(this[contextKey]);
+    },
+
+    /**
+     * Called by the constructor to get the initial render context.
+     * @returns {object}
+     */
+    getInitialRenderContext: function () {
+        return {};
     },
 
     /**
@@ -1066,19 +1164,7 @@ Component[prototype] = {
      */
     updateOptions: function (options) {
 
-        var changed = false;
-        var optionKeys = keys(options);
-        var key, i;
-
-        for (i = 0; i < optionKeys.length; i++) {
-            key = optionKeys[i];
-            if (!equals(this.options[key], options[key])) {
-                changed = true;
-                this.options[key] = options[key];
-            }
-        }
-
-        if (changed) {
+        if (updateObject(this.options, options)) {
             this.onOptionsChange();
         }
 
@@ -1214,6 +1300,7 @@ Component[prototype] = {
         }
 
         this[stateKey] = STATE_DESTROYING;
+        this[contextKey] = null;
 
         // invoke destroy on all child Components
         invoke(parse(this.el, true), 'destroy');

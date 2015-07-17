@@ -94,6 +94,21 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                 expect(el.getAttribute('is')).to.eql(component.name);
             });
 
+            it('should only call render() if the root element was created in the constructor function.', function () {
+
+                var renderSpy = sinon.spy();
+
+                var C = baustein.register(createComponentName(), {
+                    render: renderSpy
+                });
+
+                var c1 = new C();
+                var c2 = new C(document.createElement('div'));
+
+                expect(renderSpy.callCount).to.equal(1);
+                expect(renderSpy.getCall(0).calledOn(c1)).to.equal(true);
+            });
+
             it('should save passed options', function () {
 
                 var options = {
@@ -146,10 +161,11 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
             it('should support passing the template function as an option', function () {
                 var c = new Component({
                     template: function () {
-                        return '<div>hi there</div>';
+                        return '<div class="foo bar">hi there</div>';
                     }
                 });
                 expect(c.el.innerHTML).to.equal('hi there');
+                expect(c.el.className).to.equal('foo bar');
             });
 
             it('should call setupEvents passing it a bound version of registerEvent', function () {
@@ -364,6 +380,21 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     c.appendTo(document.body);
                 });
 
+                it('should set the render context to null', function () {
+                    var C = baustein.register(createComponentName(), {
+                        getInitialRenderContext: function () {
+                            return {
+                                name: 'Richard'
+                            };
+                        }
+                    });
+
+                    var c = new C();
+                    expect(c.getRenderContext().name).to.equal('Richard');
+                    c.destroy();
+                    expect(c.getRenderContext()).to.equal(null);
+                });
+
             });
 
             describe('#render()', function () {
@@ -381,7 +412,7 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                         template: function (context) {
                             return '<div>' + context.count + '</div>';
                         },
-                        getRenderContext: function () {
+                        getInitialRenderContext: function () {
                             return {
                                 count: 5
                             }
@@ -423,23 +454,160 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
                 });
 
-                it('should invoke the function passing "this" as the first argument', function () {
+            });
+
+            describe('#getInitialRenderContext()', function () {
+
+                it('should be called when the component is created', function () {
+                    var C = baustein.register(createComponentName(), {
+                        getInitialRenderContext: sinon.spy()
+                    });
+
+                    var c = new C();
+                    expect(c.getInitialRenderContext.callCount).to.equal(1);
+                });
+
+                it('should not affect the components render state if the object returned is later mutated', function () {
+                    var context = {
+                        foo: 'bar'
+                    };
 
                     var C = baustein.register(createComponentName(), {
-                        tagName: 'span',
-                        template: function (ctx) {
-                            var toLower = function (s) {
-                                return s.toLowerCase();
-                            };
-                            var className = ctx.options.text.split(' ').map(toLower).join('-');
-                            return '<span class="' + className + '">' + ctx.options.text + '</span>';
+                        getInitialRenderContext: function () {
+                            return context;
                         }
                     });
 
-                    var c = new C({text: 'Hello world'});
+                    var c = new C();
 
-                    expect(c.el.innerHTML).to.equal('Hello world');
-                    expect(c.el.className).to.equal('hello-world');
+                    expect(c.getRenderContext()).to.eql({
+                        foo: 'bar'
+                    });
+
+                    context.foo = 'baz';
+                    context.meaningoflife = 42;
+
+                    expect(c.getRenderContext()).to.eql({
+                        foo: 'bar'
+                    });
+                });
+
+            });
+
+            ['set', 'replace'].forEach(function (action) {
+
+                var methodName = action + 'RenderContext';
+
+                describe('#' + action + 'RenderContext()', function () {
+
+                    it('should ' + (action === 'set' ? 'update' : action) + ' the state with the given object', function () {
+                        var c = new Component();
+                        c[methodName]({
+                            one: 1
+                        });
+
+                        expect(c.getRenderContext()).to.eql({
+                            one: 1
+                        });
+
+                        c[methodName]({
+                            numbers: [1, 2, 3]
+                        });
+
+                        if (action === 'set') {
+                            expect(c.getRenderContext()).to.eql({
+                                one: 1,
+                                numbers: [1, 2, 3]
+                            });
+                        }
+                        else {
+                            expect(c.getRenderContext()).to.eql({
+                                numbers: [1, 2, 3]
+                            });
+                        }
+                    });
+
+                    it('should not affect the components state if the object passed in is later mutated', function () {
+                        var c = new Component();
+                        var context = {
+                            name: {
+                                first: 'Percy'
+                            }
+                        };
+                        c[methodName](context);
+
+                        expect(c.getRenderContext()).to.eql(context);
+
+                        context.name.first = 'Graham';
+
+                        expect(c.getRenderContext()).to.eql({
+                            name: {
+                                first: 'Percy'
+                            }
+                        });
+                    });
+
+                    it('should call render() if the components render context was changed', function () {
+                        var c = new Component();
+
+                        sinon.stub(c, 'render');
+
+                        var context = {
+                            number: 1,
+                            string: 'hello',
+                            arr: [1, 2, 3],
+                            obj: {
+                                key: 'value'
+                            }
+                        };
+
+                        c[methodName](context);
+                        c[methodName](context);
+                        c[methodName](context);
+
+                        context.arr.push(4);
+                        c[methodName](context);
+                        c[methodName](context);
+                        c[methodName](context);
+
+                        expect(c.render.callCount).to.equal(2);
+                    });
+
+                    it('should allow functions to be in the context', function () {
+                        var c = new Component();
+                        c[methodName]({
+                            foo: function () {
+                                return 5;
+                            }
+                        });
+
+                        expect(c.getRenderContext().foo()).to.equal(5);
+                    });
+
+                });
+
+            });
+
+            describe('#getRenderContext()', function () {
+
+                it('should return a clone of the current render context', function () {
+                    var c = new Component();
+                    c.setRenderContext({
+                        foo: 'bar'
+                    });
+
+                    var context = c.getRenderContext();
+                    expect(context).to.eql({
+                        foo: 'bar'
+                    });
+
+                    var context2 = c.getRenderContext();
+
+                    // it should not be the same object
+                    expect(context).to.not.equal(context2);
+
+                    // but it should be equivalent
+                    expect(context).to.eql(context2);
                 });
 
             });
