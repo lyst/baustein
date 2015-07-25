@@ -1591,6 +1591,7 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     var c = new C(initial);
                     c.updateOptions(update);
                     expect(spy.callCount).to.equal(1);
+                    expect(spy.getCall(0).args[0]).to.eql(initial);
                 });
 
             });

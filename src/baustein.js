@@ -1159,13 +1159,14 @@ Component[prototype] = {
 
     /**
      * Updates this components options. If calling this method results in the options changing then
-     * `onOptionsChanged` will be called.
+     * `onOptionsChanged` will be called with the previous options.
      * @param options
      */
     updateOptions: function (options) {
+        var optionsClone = clone(this.options);
 
         if (updateObject(this.options, options)) {
-            this.onOptionsChange();
+            this.onOptionsChange(optionsClone);
         }
 
         return this;
