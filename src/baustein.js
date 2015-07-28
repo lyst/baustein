@@ -481,18 +481,15 @@ export function isComponent(component) {
     return component instanceof Component;
 }
 
-function ensureEventHasMethod(event, method, property) {
-    var originalMethod = event[method];
-
-    if (typeof event[property] === 'undefined') {
-        event[property] = false;
+function ensureEventHasMethod(event, methodName, propertyName) {
+    if (propertyName in event || methodName in event) {
+        return; // don't override existing methods
     }
 
-    event[method] = function () {
-        event[property] = true;
-        if (originalMethod) {
-            return originalMethod[apply](event, arguments);
-        }
+    event[propertyName] = false;
+
+    event[methodName] = function () {
+        event[propertyName] = true;
     };
 }
 
