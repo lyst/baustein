@@ -628,7 +628,7 @@ function pushEventJobsForGlobalHandlers(event) {
 /**
  * Parses the given element or the root element and creates Component instances.
  * @param {HTMLElement} [node] If not provided then the <body> will be parsed.
- * @param {boolean} [ignoreRootNode=false] If not provided then the <body> will be parsed.
+ * @param {boolean} [ignoreRootNode=false] If `true` then the root not will not be parsed or returned.
  * @returns {Component[]}
  */
 export function parse(node, ignoreRootNode) {
@@ -640,25 +640,27 @@ export function parse(node, ignoreRootNode) {
         throw Error('node must be an HTMLElement');
     }
 
-    var els = slice[call](node.querySelectorAll('[is]'));
-    var component;
+    var result = [];
 
-    // if it's not being ignored add the root element to the front
-    if (ignoreRootNode !== true) {
-        els.unshift(node);
+    for (var i = 0; i < node.childNodes.length; i++) {
+        if (isElement(node.childNodes[i])) {
+            result = result.concat(parse(node.childNodes[i], false));
+        }
     }
 
-    return els.reduce(function (result, el) {
-
-        component = fromElement(el);
-
-        if (component && component[stateKey] !== STATE_DESTROYED) {
-            result[push](component);
-        }
-
+    // If `ignoreRootNode` is true then we can just return the
+    // result of calling `parse` on all children.
+    if (ignoreRootNode === true) {
         return result;
+    }
 
-    }, []);
+    var component = fromElement(node);
+
+    if (component && component[stateKey] !== STATE_DESTROYED) {
+        result[push](component);
+    }
+
+    return result;
 }
 
 /**

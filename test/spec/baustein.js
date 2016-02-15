@@ -324,15 +324,12 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
                     expect(parent.destroy.callCount).to.equal(1);
                     expect(child.destroy.callCount).to.equal(1);
-
-                    // We expect this to be called twice as it will first be called as a result
-                    // of `parent` calling destroy on all it's children and then again as a result
-                    // of `child` calling destroy on all it's children.
-                    expect(grandchild.destroy.callCount).to.equal(2);
+                    expect(grandchild.destroy.callCount).to.equal(1);
 
                     // check destroy() was called on each component in the expected order
                     expect(parent.destroy.calledBefore(child.destroy)).to.equal(true);
-                    expect(child.destroy.calledBefore(grandchild.destroy)).to.equal(true);
+                    expect(parent.destroy.calledBefore(grandchild.destroy)).to.equal(true);
+                    expect(grandchild.destroy.calledBefore(child.destroy)).to.equal(true);
                 });
 
                 it('during the emitting of the "destroy" event isDestroying() is true', function () {
@@ -1383,8 +1380,8 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     // setTimeout, 100ms should be more than enough.
                     setTimeout(function () {
                         expect(spy.callCount).to.equal(2);
-                        expect(spy.getCall(0).thisValue).to.equal(c1);
-                        expect(spy.getCall(1).thisValue).to.equal(c2);
+                        expect(spy.getCall(0).thisValue).to.equal(c2);
+                        expect(spy.getCall(1).thisValue).to.equal(c1);
                         done();
                     }, 100);
                 });
@@ -1419,8 +1416,8 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                     // setTimeout, 100ms should be more than enough.
                     setTimeout(function () {
                         expect(spy.callCount).to.equal(2);
-                        expect(spy.getCall(0).thisValue).to.equal(c1);
-                        expect(spy.getCall(1).thisValue).to.equal(c2);
+                        expect(spy.getCall(0).thisValue).to.equal(c2);
+                        expect(spy.getCall(1).thisValue).to.equal(c1);
                         done();
                     }, 100);
                 });
@@ -1828,7 +1825,7 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
                 var c2 = new C();
                 c2.appendTo(c1);
 
-                expect(baustein.parse(c1.el)).to.eql([c1, c2]);
+                expect(baustein.parse(c1.el)).to.eql([c2, c1]);
                 expect(baustein.parse(c1.el, true)).to.eql([c2]);
             });
 
