@@ -10,8 +10,9 @@ Baustein is a component library that we use at [Lyst](http://www.lyst.com) to bu
 * [Using options](#using-options)
 * [Creating components programmatically](#creating-components-programmatically)
 * [Working with templates](#working-with-templates)
-* The render context
-* Handling custom events
+* [The render context](#the-render-context)
+* [Custom events](#custom-events)
+* [Testing](#testing)
 
 
 ## The Basics
@@ -196,6 +197,42 @@ baustein.register('highlightable-list', {
 });
 ```
 
+### Changing options
+
+Options can be changed at any time using the `updateOptions(options)` method. This method will merge the new options with the old ones and if they have changed in any way call `onOptionsChange()`, passing it the old options. So for example if we wanted to support changing the `activeClass` option in the `highlightable-list` component:
+
+```js
+baustein.register('highlightable-list', {
+
+    defaultOptions: {
+        activeClass: 'active'
+    },
+
+    setupEvents(add) {
+        add('click', 'li', this.onItemClick);
+    },
+    
+    onOptionsChange(oldOptions) {
+        const items = Array.from(this.el.querySelectorAll('li'));
+        const {activeClass} = this.options;
+        items.forEach(item => {
+            const isActive = item.classList.has(oldOptions.activeClass);
+            item.classList.toggle(activeClass, isActive);
+            item.classList.remove(oldOptions.activeClass);
+        });
+    },
+    
+    onItemClick(event, clickedItem) {
+        const items = Array.from(this.el.querySelectorAll('li'));
+        const {activeClass} = this.options;
+        items.forEach(item => item.classList.toggle(activeClass, item === clickedItem));
+    }
+
+});
+```
+
+`updateOptions` will mostly be called by parent components wanting to change the state of a child, but there is nothing to stop a component from updating it's own options.
+
 ## Creating components programmatically
 Although progressively enhancing server-rendered HTML is a big use case of Baustein it is also possible to create components programmatically. The `baustein.register()` function returns a constructor function which can be used to create a new instance of the component.
 
@@ -283,4 +320,120 @@ Now if we inspect the body we should see something like our original HTML.
 
 ## Working with templates
 
-Obviously building HTML strings manually in functions is not a very scalable way to write HTML, but since all Baustein requires is a function that returns an HTML string you are free to use whatever templating language you want. At Lyst we use [Jinja2](http://jinja.pocoo.org/docs/dev/) templates in our Django backend and then use [jinja-to-js](https://github.com/jonbretman/jinja-to-js) to compile these templates into JS functions, meaning we can share the same templates been client and server.
+Building HTML strings manually in functions is not a very scalable way to write HTML, but since all Baustein requires is a function that returns an HTML string you are free to use whatever templating language you want. At Lyst we use [Jinja2](http://jinja.pocoo.org/docs/dev/) templates in our Django backend and then use [jinja-to-js](https://github.com/jonbretman/jinja-to-js) to compile these templates into JS functions, meaning we can share the same templates between client and server.
+
+## The Render Context
+
+As shown from the previous examples the `template` function is called with the component instance as the `this` value, but it is also passed a render context object as its first argument. The render context starts off as being whatever is returned by the `getInitialRenderContext()` method, or `{}` if this method is not implemented. It can then be changed by using `setRenderContext(context)` or  `replaceRenderContext(context)`, with the former updating the render context with the passed object and the latter completely replacing it. In both cases if the resulting render context changes in any way `render()` is called, which in turn calls the `template` function passing it the new render context. The current render context can be retreived at any time using `getRenderContext()`, but note that this function returns a **copy** of the current render context, so mutating will not change the underlying components context. To update the context you **must** use either `setRenderContext(context)` or  `replaceRenderContext(context)`.
+
+As an example:
+
+```js
+baustein.register('todo-items', {
+
+    template(context) {
+        return `
+            <div is="todo-items">
+                <form>
+                    <input name="todo-input">
+                    <input type="submit" value="add todo">
+                </form>
+                <button>Clear all</button>
+                <ul>
+                    ${context.todos.map(todo => `<li>${todo}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    },
+    
+    setupEvents(add) {
+        add('submit', 'form', this.addTodo);
+        add('click', 'button', this.clearAll);
+    },
+    
+    getInitialRenderContext() {
+        return {
+            todos: []
+        };
+    },
+    
+    addTodo(event) {
+        event.preventDefault();
+
+        const todo = this.el.querySelector('input').value;
+        const context = this.getRenderContext();
+        
+        context.todos.push(todo);
+
+        // this will cause a render as we changed the context
+        this.setRenderContext(context);
+    },
+    
+    clearAll() {
+        // this will cause a render only if the `todos` list was not already empty
+        this.replaceRenderContext({
+            todos: []
+        });
+    }
+
+});
+```
+
+### Render context vs. options
+
+Although these two things may seem similar they are intended for different things. Think of a components options as the public API to change a components state (e.g. an object id) and the render context as the full data structure needed to render the template (e.g. data fetched from an API).
+
+## Custom events
+
+Components will often need to communicate with each other and in the case of child to parent communication emitting custom events is the preferred way of implementing this. Components can emit events to their parents using the `emit(eventName, eventData)` function and can listen to events from their children in the same way as they do for DOM events. This is best explained with an example:
+
+```html
+<ul is="hightable-list">
+    <li is="highlightable-list-item">John</li>
+    <li is="highlightable-list-item">Paul</li>
+    <li is="highlightable-list-item">George</li>
+    <li is="highlightable-list-item">Ringo</li>
+</ul>
+```
+
+```js
+baustein.register('highlightable-list', {
+
+    setupEvents(add) {
+        add('item-selected', 'highlightable-list-item', this.onItemSelected);
+    },
+    
+    onItemSelected(event) {
+        this.findComponents('highlightable-list-item').forEach(item => {
+            item.setHighlighted(item === event.target);
+        }); 
+    }
+
+});
+
+baustein.register('highlightable-list-item', {
+
+    setupEvents(add) {
+        add('click', this.onClick);
+    },
+    
+    onClick() {
+        this.emit('item-selected');
+    },
+    
+    setHighlighted(highlighted) {
+        this.el.classList.toggle('highlighted', highlighted);
+    }
+
+});
+```
+
+As well as showing how custom events can be emitted this example also introduced the `findComponents(componentName)` method, which can be used to find child components of a certain type.
+
+### Stopping propagation of custom events
+
+Custom events propagate in the same was native DOM event, moving up the tree. If you want to stop an event propagating any further up the tree then you can call `stopPropagation()` on the event and it will not be dispatched to any components further up the tree.
+
+## Testing
+
+Coming soon...
