@@ -95,7 +95,13 @@ var allEvents = {
     resize: true,
     load: true,
     orientationchange: true,
-    input: false
+    input: false,
+    drag: false,
+    dragstart: false,
+    dragend: false,
+    dragenter: false,
+    dragleave: false,
+    drop: false
 };
 
 /**
