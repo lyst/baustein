@@ -769,7 +769,7 @@ function mutationEventHandler(event) {
 /**
  * Binds all events.
  */
-export function bindEvents() {
+function bindEvents() {
     eventManager('addEventListener');
 
     // use MutationObserver if available
@@ -797,7 +797,7 @@ export function bindEvents() {
 /**
  * Unbinds all events.
  */
-export function unbindEvents() {
+function unbindEvents() {
     eventManager('removeEventListener');
 
     if (observer) {
@@ -1530,4 +1530,19 @@ Component[prototype] = {
         return this[stateKey] == STATE_DETACHED;
     }
 
+};
+
+export default {
+    fromElement: fromElement,
+    isComponent: isComponent,
+    handleEvent: handleEvent,
+    parse: parse,
+    register: register,
+    unregister: unregister,
+    init: init,
+    reset: reset,
+    getInstanceOf: getInstanceOf,
+    getInstancesOf: getInstancesOf,
+    destroy: destroy,
+    Component: Component
 };
