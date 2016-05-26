@@ -367,10 +367,18 @@ function parseAttributes(el) {
         name = toCamelCase(el[attributes][i].name);
         value = el[attributes][i].value;
 
+        // Try parsing as JSON
         try {
             value = JSON.parse(value);
         }
         catch (e) {
+            // Try decoding as base64 and then parsing as JSON
+            try {
+                value = JSON.parse(win.atob(value));
+            }
+            catch (er) {
+                // oh well.
+            }
         }
 
         result[name] = value;

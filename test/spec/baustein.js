@@ -125,13 +125,17 @@ define(['../../dist/baustein.amd.js'], function (baustein) {
 
                 var el = document.createElement('div');
                 el.setAttribute('foo', 'foo');
-                el.setAttribute('bar', JSON.stringify({key: 'value'}));
+                el.setAttribute('bar-json', JSON.stringify({key: 'valué "foo"'}));
+                el.setAttribute('bar-base64', window.btoa(JSON.stringify({key: 'valué "foo"'})));
                 el.setAttribute('baz-bob', 5);
 
                 expect(new Component(el).options).to.eql({
                     foo: 'foo',
-                    bar: {
-                        key: 'value'
+                    barJson: {
+                        key: 'valué "foo"'
+                    },
+                    barBase64: {
+                        key: 'valué "foo"'
                     },
                     bazBob: 5
                 });
