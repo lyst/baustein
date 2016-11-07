@@ -363,29 +363,35 @@ function parseAttributes(el) {
     var value;
 
     for (var i = 0; i < el[attributes][lengthKey]; i++) {
-
         name = toCamelCase(el[attributes][i].name);
-        value = el[attributes][i].value;
-
-        // Try parsing as JSON
-        try {
-            value = JSON.parse(value);
-        }
-        catch (e) {
-            // Try decoding as base64 and then parsing as JSON
-            try {
-                value = JSON.parse(win.atob(value));
-            }
-            catch (er) {
-                // oh well.
-            }
-        }
+        value = tryJSON(el[attributes][i].value);
 
         result[name] = value;
-
     }
 
     return result;
+}
+
+/**
+ * Try to JSON decode a string. Possibly Base64 encoded.
+ *
+ * Will try to decode this string to an object. Will return the original string
+ * if JSON.parse fails.
+ * @param {String} value
+ * @returns {*}
+ */
+function tryJSON(value) {
+    if (value.endsWith("==")) {
+        try {
+            return JSON.parse(win.atob(value));
+        } catch (er) {}
+    }
+
+    try {
+        return JSON.parse(value);
+    } catch (er) {}
+
+    return value;
 }
 
 /**
