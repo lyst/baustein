@@ -104,6 +104,8 @@ var allEvents = {
     drop: false
 };
 
+var b64regex = /^([0-9a-zA-Z+/]{4})*(([0-9a-zA-Z+/]{2}==)|([0-9a-zA-Z+/]{3}=))?$/;
+
 /**
  * Returns the 'inner' type of `obj`.
  * @param {*} obj
@@ -381,17 +383,18 @@ function parseAttributes(el) {
  * @returns {*}
  */
 function tryJSON(value) {
-    if (value.endsWith("==")) {
+    if (b64regex.test(value)) {
         try {
             return JSON.parse(win.atob(value));
-        } catch (er) {}
+        } catch (er) {
+        }
     }
 
     try {
         return JSON.parse(value);
-    } catch (er) {}
-
-    return value;
+    } catch (er) {
+        return value;
+    }
 }
 
 /**
