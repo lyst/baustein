@@ -104,6 +104,8 @@ var allEvents = {
     drop: false
 };
 
+var b64regex = /^([0-9a-zA-Z+/]{4})*(([0-9a-zA-Z+/]{2}==)|([0-9a-zA-Z+/]{3}=))?$/;
+
 /**
  * Returns the 'inner' type of `obj`.
  * @param {*} obj
@@ -363,29 +365,36 @@ function parseAttributes(el) {
     var value;
 
     for (var i = 0; i < el[attributes][lengthKey]; i++) {
-
         name = toCamelCase(el[attributes][i].name);
-        value = el[attributes][i].value;
-
-        // Try parsing as JSON
-        try {
-            value = JSON.parse(value);
-        }
-        catch (e) {
-            // Try decoding as base64 and then parsing as JSON
-            try {
-                value = JSON.parse(win.atob(value));
-            }
-            catch (er) {
-                // oh well.
-            }
-        }
+        value = tryJSON(el[attributes][i].value);
 
         result[name] = value;
-
     }
 
     return result;
+}
+
+/**
+ * Try to JSON decode a string. Possibly Base64 encoded.
+ *
+ * Will try to decode this string to an object. Will return the original string
+ * if JSON.parse fails.
+ * @param {String} value
+ * @returns {*}
+ */
+function tryJSON(value) {
+    if (b64regex.test(value)) {
+        try {
+            return JSON.parse(win.atob(value));
+        } catch (er) {
+        }
+    }
+
+    try {
+        return JSON.parse(value);
+    } catch (er) {
+        return value;
+    }
 }
 
 /**
