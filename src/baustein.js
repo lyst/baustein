@@ -125,7 +125,7 @@ function keys(obj) {
  * @returns {Boolean}
  */
 function isObject(obj) {
-    return type(obj) === 'object';
+    return type(obj) === 'object' && !isElement(obj);
 }
 
 /**

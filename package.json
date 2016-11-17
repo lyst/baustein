@@ -1,35 +1,54 @@
 {
   "name": "baustein",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "scripts": {
-    "test": "grunt build && grunt test"
+    "build": "rm -rf dist/** && mkdir dist && npm run lint && babel src/baustein.js -o dist/baustein.js",
+    "lint": "eslint src",
+    "test": "NODE_ENV=test nyc mocha test/spec/baustein.js"
   },
-  "main": "src/baustein.js",
+  "main": "dist/baustein.js",
+  "jsnext:main": "src/baustein.js",
   "engines": {
-    "node": ">=0.10.0"
+    "node": ">=4.x.x"
   },
   "author": "Lyst <devs@lyst.com>",
   "repository": {
     "type": "git",
     "url": "git://github.com/ssaw/baustein.git"
   },
+  "nyc": {
+    "exclude": [
+      "coverage/**",
+      "dist/**",
+      "node_modules/**",
+      "test/**",
+      "Gruntfile.js"
+    ],
+    "reporter": [
+      "lcov",
+      "text-summary"
+    ],
+    "require": [
+      "babel-register",
+      "./test/jsdom"
+    ],
+    "sourceMap": false,
+    "instrument": false
+  },
   "license": "ISC",
-  "devDependencies": {
-    "grunt": "~0.4.2",
-    "grunt-contrib-clean": "~0.5.0",
-    "grunt-contrib-jshint": "~0.10.0",
-    "grunt-contrib-uglify": "~0.5.1",
-    "grunt-es6-module-transpiler": "^0.6.0",
-    "grunt-karma": "^0.10.1",
-    "karma": "^0.12.31",
-    "karma-coverage": "^0.2.7",
-    "karma-expect": "^1.1.0",
-    "karma-mocha": "^0.1.10",
-    "karma-mocha-reporter": "^0.3.1",
-    "karma-phantomjs-launcher": "^0.1.4",
-    "karma-requirejs": "^0.2.2",
-    "karma-sinon": "^1.0.4",
-    "load-grunt-tasks": "^2.0.0",
-    "requirejs": "^2.1.17"
+  "dependencies": {
+    "babel": "6.5.2",
+    "babel-cli": "6.18.0",
+    "babel-core": "6.18.2",
+    "babel-plugin-istanbul": "3.0.0",
+    "babel-plugin-transform-es2015-modules-umd": "6.18.0",
+    "babel-register": "6.18.0",
+    "chai": "3.5.0",
+    "eslint": "3.10.2",
+    "expect.js": "0.3.1",
+    "jsdom": "9.8.3",
+    "mocha": "3.1.2",
+    "nyc": "9.0.1",
+    "sinon": "1.17.6"
   }
 }
