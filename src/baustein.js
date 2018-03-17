@@ -168,10 +168,16 @@ function noop () {
  * @param {String} str
  * @returns {String}
  */
-function toCamelCase (str) {
-    return str.replace(/\-(.)/g, function (a,b) {
-        return b.toUpperCase();
-    });
+function toCamelCase(str) {
+    var parts = str.split('-');
+    var i = 0;
+    var j = parts.length;
+
+    while (++i < j) {
+        parts[0] += parts[i].substring(0, 1).toUpperCase() + parts[i].substring(1);
+    }
+
+    return parts[0];
 }
 
 /**
