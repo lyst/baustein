@@ -104,7 +104,8 @@ var allEvents = {
     drop: false
 };
 
-var b64regex = /^([0-9a-zA-Z+/]{4})*(([0-9a-zA-Z+/]{2}==)|([0-9a-zA-Z+/]{3}=))?$/;
+var jsonRegex = /^[0-9{["tfn]/;
+var b64json = /^[bedIMONWZ]/;
 
 /**
  * Returns the 'inner' type of `obj`.
@@ -383,18 +384,24 @@ function parseAttributes(el) {
  * @returns {*}
  */
 function tryJSON(value) {
-    if (b64regex.test(value)) {
+    if (value.length % 4 === 0 && b64json.test(value)) {
         try {
-            return JSON.parse(win.atob(value));
+            var decode = win.atob(value);
+            if (jsonRegex.test(decode)) {
+                return JSON.parse(decode);
+            }
         } catch (er) {
         }
     }
 
     try {
-        return JSON.parse(value);
+        if (jsonRegex.test(value)) {
+            return JSON.parse(value);
+        }
     } catch (er) {
-        return value;
     }
+
+    return value;
 }
 
 /**
