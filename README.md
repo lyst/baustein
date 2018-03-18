@@ -1,6 +1,6 @@
 # baustein
 
-[![Build Status:](https://secure.travis-ci.org/ssaw/baustein.png?branch=master)](https://travis-ci.org/ssaw/baustein)
+[![Build Status:](https://secure.travis-ci.org/lyst/baustein.png?branch=master)](https://travis-ci.org/lyst/baustein)
 
 Baustein is a component library that we use at [Lyst](http://www.lyst.com) to build the front-end of our website. It has some similarities with other component-based frameworks such as [React](https://facebook.github.io/react/) or [FruitMachine](https://github.com/ftlabs/fruitmachine), but grew very organically out of the specific needs we had at [Lyst](http://www.lyst.com).
 

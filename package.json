@@ -14,7 +14,7 @@
   "author": "Lyst <devs@lyst.com>",
   "repository": {
     "type": "git",
-    "url": "git://github.com/ssaw/baustein.git"
+    "url": "git://github.com/lyst/baustein.git"
   },
   "nyc": {
     "exclude": [
