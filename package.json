@@ -1,6 +1,6 @@
 {
   "name": "baustein",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "scripts": {
     "build": "rm -rf dist/** && mkdir dist && npm run lint && babel src/baustein.js -o dist/baustein.js",
     "lint": "eslint src",

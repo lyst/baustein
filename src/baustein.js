@@ -104,9 +104,6 @@ var allEvents = {
     drop: false
 };
 
-var jsonRegex = /^[0-9{["tfn]/;
-var b64json = /^[bedIMONWZ]/;
-
 /**
  * Returns the 'inner' type of `obj`.
  * @param {*} obj
@@ -389,19 +386,20 @@ function parseAttributes(el) {
  * @param {String} value
  * @returns {*}
  */
+const b64startChars = new Set('bedIMONWZ');
+const jsonStartChars = new Set('{[0123456789tfn"');
+
 function tryJSON(value) {
-    if (value.length % 4 === 0 && b64json.test(value)) {
+    if (value.length % 4 === 0 && b64startChars.has(value[0])) {
         try {
             var decode = win.atob(value);
-            if (jsonRegex.test(decode)) {
-                return JSON.parse(decode);
-            }
+            return JSON.parse(decode);
         } catch (er) {
         }
     }
 
     try {
-        if (jsonRegex.test(value)) {
+        if (jsonStartChars.has(value[0])) {
             return JSON.parse(value);
         }
     } catch (er) {
