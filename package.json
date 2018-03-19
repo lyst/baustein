@@ -1,6 +1,6 @@
 {
   "name": "baustein",
-  "version": "2.0.3",
+  "version": "2.0.6",
   "scripts": {
     "build": "rm -rf dist/** && mkdir dist && npm run lint && babel src/baustein.js -o dist/baustein.js",
     "lint": "eslint src",
@@ -42,6 +42,7 @@
     "babel-core": "6.26.0",
     "babel-plugin-istanbul": "4.1.5",
     "babel-plugin-transform-es2015-modules-umd": "6.24.1",
+    "babel-preset-env": "1.6.1",
     "babel-register": "6.26.0",
     "chai": "3.5.0",
     "eslint": "3.10.2",

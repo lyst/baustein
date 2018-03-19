@@ -386,8 +386,8 @@ function parseAttributes(el) {
  * @param {String} value
  * @returns {*}
  */
-const b64startChars = new Set('bedIMONWZ');
-const jsonStartChars = new Set('{[0123456789tfn"');
+const b64startChars = new Set(Array.from('bedIMONWZ'));
+const jsonStartChars = new Set(Array.from('{[0123456789tfn"'));
 
 function tryJSON(value) {
     if (value.length % 4 === 0 && b64startChars.has(value[0])) {
