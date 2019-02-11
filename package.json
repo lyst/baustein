@@ -1,6 +1,6 @@
 {
   "name": "baustein",
-  "version": "2.0.6",
+  "version": "2.0.7",
   "scripts": {
     "build": "rm -rf dist/** && mkdir dist && npm run lint && babel src/baustein.js -o dist/baustein.js",
     "lint": "eslint src",
@@ -36,7 +36,7 @@
     "instrument": false
   },
   "license": "ISC",
-  "dependencies": {
+  "devDependencies": {
     "babel": "6.23.0",
     "babel-cli": "6.26.0",
     "babel-core": "6.26.0",
@@ -48,8 +48,8 @@
     "eslint": "3.10.2",
     "expect.js": "0.3.1",
     "jsdom": "9.8.3",
-    "mocha": "3.1.2",
-    "nyc": "9.0.1",
+    "mocha": "^5.2.0",
+    "nyc": "^13.2.0",
     "sinon": "1.17.6"
   }
 }
