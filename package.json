@@ -1,10 +1,11 @@
 {
-  "name": "baustein",
+  "name": "@lyst/baustein",
   "version": "2.0.7",
   "scripts": {
     "build": "rm -rf dist/** && mkdir dist && npm run lint && babel src/baustein.js -o dist/baustein.js",
     "lint": "eslint src",
-    "test": "NODE_ENV=test nyc mocha test/spec/baustein.js"
+    "test": "NODE_ENV=test nyc mocha test/spec/baustein.js",
+    "publish": "npm publish --access public"
   },
   "main": "dist/baustein.js",
   "jsnext:main": "src/baustein.js",
